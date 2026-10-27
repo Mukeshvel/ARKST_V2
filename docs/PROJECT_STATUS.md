@@ -1,11 +1,71 @@
-# Project status — Milestone 2, 2026-10-26
+# Project status — Milestone 2.1, 2026-10-27
 
-**Identity implementation is authored; live Auth/PostgreSQL/RLS verification is blocked.**
+**Local identity foundation verified:** 36 real database policy assertions and 12 real
+Auth/application integration groups passed. Milestone 3 has not started.
+
+## Milestone 2.1 verification (2026-10-27)
+
+Inspected current Git state, all project docs, identity migration, Supabase tests,
+integration harness, package setup and CLI availability. The 49 project files previously
+described as untracked are now present in the reviewed baseline commit
+`02c2707` (`foundation completed + initial Database code implemented`); `main` matches
+`origin/main`. This turn modifies `.gitignore`, this status file, `docs/LOCAL_SUPABASE.md`,
+`docs/IDENTITY_TESTS.md`, `package.json`, `package-lock.json`, `supabase/config.toml`
+and `scripts/test-local-identity.mjs`; there are no staged or untracked files. The
+baseline is a good checkpoint. Keep these verification changes in a separate reviewable
+commit; no commit or push was made in this turn.
+
+Docker Desktop 4.97.0, Docker Client/Server 29.9.2, WSL2, 12 CPUs. Docker reports
+3,935,092,736 bytes (3.665 GiB) available, matching the supplied limit. No containers
+or images were present before this work. `docker ps -a`, `docker info` and initial image
+checks confirmed this. Supabase CLI 2.122.0 is pinned as a project-local dev dependency.
+The normal CLI home path was inaccessible in the sandbox, so `SUPABASE_HOME` was
+pointed to ignored `.supabase-home/` inside the repository; no user profile data was
+changed. Docker access required elevated tool execution; user authorized this local
+verification. No remote project was linked or contacted.
+
+| Command/check                                                                                                                    | Actual result                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install --save-dev --save-exact supabase@2.122.0`                                                                           | Passed; exact stable CLI installed locally.                                                                                                                                                                                                                                                                                                                                   |
+| `npx supabase --version`                                                                                                         | Passed: 2.122.0. First help attempt without a writable SUPABASE_HOME failed with EPERM for `C:\Users\HP\.supabase`; using ignored repo-local SUPABASE_HOME resolved it.                                                                                                                                                                                                       |
+| `npx supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor` | Startup succeeded with CLI health checks enabled, no `--ignore-health-check`, no experimental feature. PostgreSQL, GoTrue Auth, PostgREST and Kong were healthy/running. Realtime image was also pulled by the CLI but its container was stopped/excluded. Image pulls: Postgres 1.7 GB, Realtime 559 MB, Kong 203 MB, Auth 94 MB, PostgREST 41 MB, plus pg_prove test image. |
+| Docker memory during normal startup                                                                                              | No resource failure. Once running, measured DB ~85 MiB, Auth ~14 MiB, Kong ~136 MiB, PostgREST ~26 MiB (about 261 MiB total of 3.665 GiB at that sample).                                                                                                                                                                                                                     |
+| Initial local migration application                                                                                              | CLI reported `Applying migration 20261026000100_identity_foundation.sql...`; no SQL error. pgTAP below independently exercised the resulting schema.                                                                                                                                                                                                                          |
+| `npm run test:rls` / `npx supabase test db --local`                                                                              | **Passed twice: 36 pgTAP assertions per run.** Both outputs: `All tests successful`, `Files=1, Tests=36`, `Result: PASS`. Two harmless grants warnings for optional `pg_net`/`pg_cron` helper functions came from test setup. The second run was after the preserved-volume restart.                                                                                          |
+| Initial `node scripts/test-local-identity.mjs`                                                                                   | Failed before the first check: real Supabase Auth returned HTTP 422 `email_provider_disabled`. This revealed local email provider sign-in had been disabled in config. The harness cleaned generated users, scope and staff roles.                                                                                                                                            |
+| Approved local config correction and restart                                                                                     | User approved enabling `auth.email.enable_signup` while keeping global `auth.enable_signup=false`. `supabase stop` reported `backup=true`; `supabase start` restored that database and passed standard health checks. No database reset.                                                                                                                                      |
+| `node scripts/test-local-identity.mjs` with real local settings and an ephemeral production Next server                          | **Passed all 12 groups against genuine local Auth, PostgreSQL/PostgREST and HTTP.** Includes a real signup attempt rejected with `signup_disabled`, actual password sign-in, cookies, RLS isolation, role-write denial, database failure and logout. Harness deleted generated accounts/scope and temporary failure policy.                                                   |
+| Bare `npm run test:identity`                                                                                                     | As designed, exits 1 with `BLOCKED` without explicit isolated-local environment. It ran successfully above when process-only local settings were supplied.                                                                                                                                                                                                                    |
+| `npm run check`                                                                                                                  | Passed after final harness/config changes: format, typecheck, lint, 59 Vitest tests, 10 local-guard tests and production build.                                                                                                                                                                                                                                               |
+| `$env:SMOKE_ORIGIN='http://127.0.0.1:3100'; npm run test:smoke`                                                                  | Passed against production build: foundation page, no student API, anonymous identity denied with 503/no private data.                                                                                                                                                                                                                                                         |
+| `npm audit --audit-level=low`                                                                                                    | Sandbox attempt failed on registry DNS. Approved network retry passed: zero reported vulnerabilities.                                                                                                                                                                                                                                                                         |
+| `npm ls --all --json`                                                                                                            | Exit 0; required dependency tree valid.                                                                                                                                                                                                                                                                                                                                       |
+
+Supabase CLI startup printed generated local demo keys in its status output. They are
+local-only credentials, were not copied to repository files, and the stack was bound to
+loopback. No user-provided or remote credentials were used. The service-role key was held
+only in process memory for isolated fixture setup and never passed to the app.
+
+Current local stack remains running with the same preserved DB volume and migration.
+Only synthetic `example.test` accounts were created; the harness cleaned them all. No
+personal/college data is present. Memory remained within the Docker limit; no WSL change
+or alternate runtime was needed.
+
+## Remaining Milestone 2.1 test state
+
+The required identity scenarios passed against real local services, including direct REST
+RLS enforcement and app session checks. Actual public signup was attempted and rejected
+with `signup_disabled` while password sign-in for Admin-created test users worked. No
+fake sessions, mocked database or hardcoded identity were used.
+
+## Pre-Milestone-2 baseline (2026-10-26; superseded by the current verification above)
+
+Identity implementation was authored; live Auth/PostgreSQL/RLS verification was blocked.
 This is not production-ready software. Docker, Supabase CLI, psql and Podman were
 not found (including the usual Docker executable path). No system tools were installed,
 no remote database was contacted, and no migrations, deployment, commits or pushes occurred.
 
-## Baseline inspection and preserved work
+## Pre-Milestone-2 inspection and preserved work (2026-10-26)
 
 Read all prior docs, source/config/tests, dependency versions and Git status. The
 repository still had no commits and all 25 Milestone 1 files were untracked. Existing
@@ -77,12 +137,11 @@ retry message, which was corrected. Static review is not RLS/Auth execution evid
 
 ## Mandatory real-test status
 
-All eight required scenarios have executable integration coverage, but remain **unrun**:
-valid own profile; unauthenticated denial with configured Auth; A cannot read B;
-self-assignment of counselor/coordinator/HOD/admin denied; inactive/unprovisioned denial;
-invalid credentials/session; logout denies subsequent cookie-session access; visible
-real database failure. The suite has 11 check groups, also covering metadata tampering,
-multiple staff responsibilities and cross-origin requests.
+The required scenarios were exercised against the isolated local stack: valid own
+profile; anonymous denial; cross-user isolation; client role-write denial; inactive and
+unprovisioned denial; invalid credentials/cookies; logout access denial; and visible
+database failure/recovery. The 12 groups also cover signup disabled, metadata escalation,
+multiple staff responsibilities and CSRF. The 36 SQL/RLS assertions passed separately.
 
 The database-failure test creates a temporary restrictive policy raising a real exception
 only for its generated user. It removes the policy, function, schema, users and scope
@@ -120,19 +179,18 @@ See DECISIONS.md for official guidance and full dependency purposes.
 
 ## Decisions and next action
 
-Obtain approval before installing Docker/CLI system prerequisites, or use an already
-approved isolated development machine. Then follow LOCAL_SUPABASE.md and run both
-real suites; fix all failures before considering identity verified. Do not connect a
-remote production database as a substitute.
+Milestone 2.1 local verification is complete. Review the eight-file diff and commit it
+as a separate checkpoint when ready. Do not connect a remote project or begin Milestone 3
+as part of this verification.
 
 Confirm trusted provisioning ownership, future Google tenant/account-linking policy,
 role delegation policy, retention/audit requirements and whether simultaneous
 student-and-staff accounts are needed (current profile kind is exclusive). Future
 academic permission proposals remain provisional. Stop here: Milestone 3 is not started.
 
-## Git summary
+## Current Git summary
 
-No commits/index baseline exists, so `git diff --stat` is empty despite new/modified
-untracked files. All files remain available for review; nothing was committed or pushed.
-At review time there are 49 nonignored project files versus 25 after Milestone 1.
-Existing core rule files are preserved; no old repository was touched.
+Baseline `02c2707` exists on `main` and matches `origin/main`. Eight unstaged tracked
+files are changed for this verification. No files are staged, no files are
+untracked, and no commit or push was made here. The app/core files and migration remain
+otherwise unchanged; `.supabase-home/` is local ignored state.

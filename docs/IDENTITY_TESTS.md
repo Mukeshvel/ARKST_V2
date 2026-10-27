@@ -43,6 +43,7 @@ requests retain only cookies received from the server. No passwords or keys are 
 - Editable Auth metadata cannot grant a role or impersonate another user.
 - Inactive and unprovisioned users are denied.
 - Wrong credentials, malformed cookies and cross-origin mutations are denied.
+- Public email signup remains disabled even while the existing-user email provider is enabled.
 - Logout clears the application cookie session and subsequent access fails.
 - A genuine PostgreSQL exception produces a visible 503 and recovers after cleanup.
 
@@ -62,11 +63,11 @@ no real authentication evidence. Neither suite substitutes for the other.
 
 ## Current verification limitation
 
-Docker, Supabase CLI and PostgreSQL CLI were not available during implementation.
-The real integration suite and SQL policy tests have **not run**. They must pass on
-an isolated local stack before claiming identity/RLS correctness. Browser interaction,
-refresh-token rotation, OAuth, stolen-token replay after logout, provider outages and
-production infrastructure are not covered by this script.
+For Milestone 2.1, Docker, project-local Supabase CLI and PostgreSQL were available.
+The real application suite passed 12 groups, and the separate pgTAP suite passed 36
+assertions against that local stack. Browser visual checks, refresh-token rotation,
+OAuth, stolen-token replay after logout, provider outages and production infrastructure
+are not covered by this script.
 
 Supabase logout revokes refresh-session access, but a previously issued access JWT may
 remain valid until its expiry. Clearing an application cookie is not proof of immediate

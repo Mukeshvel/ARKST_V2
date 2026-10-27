@@ -1,5 +1,22 @@
 # Local identity verification
 
+## Milestone 2.1 observed local environment (2026-10-27)
+
+The CLI is installed as a project dev dependency at stable version 2.122.0. Docker
+Desktop 4.97.0 / Engine 29.9.2 exposes 3.665 GiB RAM. A supported `supabase start
+--exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,
+logflare,vector,supavisor` invocation brought up healthy PostgreSQL 17, Auth, PostgREST
+and Kong services with normal health checks. Realtime's image was pulled during startup
+but its container was explicitly stopped/excluded. The four running containers used
+about 275 MiB at the final sample. No memory-limit changes or experimental CLI features.
+
+The 36 pgTAP assertions passed against this isolated stack. The real Auth suite then
+failed at initial email/password sign-in with `email_provider_disabled`: the current
+`auth.email.enable_signup = false` disables the email provider. The separate global
+`auth.enable_signup = false` also remains set. No provider-config adjustment was made
+because automatic review requested user approval. Until it is approved, real app/Auth
+integration is unverified. See PROJECT_STATUS.md for the full command/result record.
+
 ## Current evidence and prerequisites
 
 At Milestone 2 inspection, `docker`, `supabase` and `psql` were not available on PATH,

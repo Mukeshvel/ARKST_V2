@@ -139,6 +139,22 @@ async function main() {
       ),
       'assign simultaneous staff responsibilities',
     );
+
+    await check(
+      'email/password provider allows authentication without enabling public signup',
+      async () => {
+        const result = await anonymous.auth.signUp({
+          email: `arkst-signup-check-${runId}@example.test`,
+          password: `T!${randomBytes(24).toString('base64url')}`,
+        });
+        // If config regresses and a user is unexpectedly created, track it for
+        // deletion in finally before marking the assertion failed.
+        if (result.data.user?.id) accounts.push({ id: result.data.user.id });
+        assert.equal(result.error?.code, 'signup_disabled');
+        assert.equal(result.data.session, null);
+      },
+    );
+
     const browser = new AppBrowser(config.appOrigin);
     const clientA = await directClient(a);
     const staffClient = await directClient(staff);

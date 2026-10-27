@@ -19,6 +19,7 @@
     "test:smoke": "node scripts/smoke.mjs",
     "test:identity": "node scripts/test-local-identity.mjs",
     "test:rls": "supabase test db --local",
+    "supabase:start:identity": "supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
@@ -37,6 +38,7 @@
     "eslint": "10.13.0",
     "pg": "8.23.1",
     "prettier": "3.9.10",
+    "supabase": "2.122.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0",
     "vitest": "5.0.5"
