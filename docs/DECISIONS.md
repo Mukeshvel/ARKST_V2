@@ -17,10 +17,9 @@
 
 ## Milestone 2 identity choices
 
-- Add real Supabase Auth/PostgreSQL integration code without pretending local services
-  exist. Docker, Supabase CLI and PostgreSQL tools are unavailable; system-level installs
-  require approval. SQL and genuine login/RLS tests remain unverified until prerequisites
-  are available. Do not replace them with fake successful tests or simulated sessions.
+- Supabase Auth/PostgreSQL integration was verified locally in Milestone 2.1 after
+  Docker became available. Milestone 3A preserves it and reruns its SQL and genuine
+  login/RLS tests. No simulated sessions or mock database substitutes are used.
 - Separate authentication from provisioning. No signup endpoint or automatic profile/role
   trigger. Local Supabase signup/anonymous sign-in are disabled. Trusted operators create
   approved profiles/responsibilities out of band; app admins have no write bypass.
@@ -73,12 +72,13 @@ Registry metadata and installed package types are used to check package compatib
 
 ## Decisions and work still needed
 
-1. Approve installation/setup of missing local container/database prerequisites before
-   executing real tests. No production database or hosted fallback is authorized.
+1. Keep verification on the approved isolated local Supabase stack. No production
+   database or hosted fallback is authorized.
 2. Define approved production identity provider/account provisioning policy, including
    college Google login configuration, invited users and disabled-user handling.
 3. Approve future role/capability matrix and delegation limits. The current own-data
-   access rules deliberately do not implement those academic privileges.
+   rules grant no academic authority based on role names. Milestone 3A supports explicit
+   capability rows, with no standing grants created by the migration.
 4. Decide organization hierarchy, dual student/staff status and group membership policy.
    Proposed publication-time recipient snapshots need explicit reconciliation rules.
 5. Confirm deadline-exclusive boundaries, late work, holidays, makeup tests, recurrence
@@ -87,4 +87,23 @@ Registry metadata and installed package types are used to check package compatib
    Assess hosting free-tier capacity, abuse controls, availability, backups and recovery
    before any deployment. No production-readiness claim is made.
 
-Milestone 3 academic workflows are outside this work and must not start automatically.
+Milestone 3A implements direct activities only. Milestone 3B must not start automatically.
+
+## Milestone 3A decisions
+
+- Preserve the modular Next.js/Supabase architecture and identity tables. Add one forward
+  migration; use session-scoped RPCs rather than service-role writes from the application.
+- Use explicit capability provisioning because the documented role matrix is provisional.
+  No teacher, counselor, HOD or admin gains authority from its name or staff classification.
+- Implement exact department/section membership and direct-student targeting only.
+  Membership expiry does not erase existing obligations; groups and hierarchy remain unimplemented.
+- Publish activity, targets and history atomically; lock per assignment for completion/review.
+  Duplicate submission is a visible 409, not a second record or a fabricated success.
+- Preserve start-inclusive/deadline-exclusive submission rules. Start < deadline <= end.
+  Late work, return/resubmit, policy edits and recurrence need later approved semantics.
+- Explicit category rows replace a closed enum; extension still requires a new capability.
+- Keep read APIs paginated, requests bounded and actor/state/targeting inputs allowlisted.
+  Read/modify errors remain visible and credentials/upstream SQL are not returned.
+
+Implementation guidance: [Supabase database functions](https://supabase.com/docs/guides/database/functions)
+and [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).

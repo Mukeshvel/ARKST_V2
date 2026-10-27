@@ -2,8 +2,8 @@
 
 ## Milestone 2 enforcement implemented in code and SQL
 
-The migration has not been applied or tested against PostgreSQL in this environment.
-These are the implemented rules to verify, not a claim of validated production security.
+Identity rules below were verified locally in Milestone 2.1 and regressed in 3A.
+Activity access is additive and explicitly provisioned, as described below.
 
 | Caller                                   | Current access                                                                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,8 +17,9 @@ These are the implemented rules to verify, not a claim of validated production s
 Every application profile read derives the ID from server-verified `getClaims` and
 `getUser`, not a request parameter or client-selected identity. The API does not offer
 an arbitrary-user lookup. PostgreSQL RLS independently restricts row visibility, including
-direct Data API access. Authenticated clients have SELECT grants only; INSERT, UPDATE
-and DELETE are revoked and there are no write policies or privileged RPCs.
+direct Data API access. On identity tables, authenticated clients have SELECT grants
+only; INSERT, UPDATE and DELETE remain revoked. Activity mutation RPCs do not grant
+any ability to change profiles, scopes or responsibility assignments.
 
 Teaching/non-teaching classification grants nothing. Roles are separate responsibility
 rows with an exact scope and validity interval. A composite foreign key permits staff
@@ -30,7 +31,8 @@ Scope records include institution, department, section and group kinds. Parent l
 are structural placeholders only: **no inherited scope permissions are implemented**.
 The schema prevents self-parenting but does not validate all longer cycles or parent-kind
 relationships. Add those constraints before any traversal or inheritance workflow.
-Students' group membership and academic access are not implemented.
+Students' group membership is not implemented. The new student_scope_memberships table
+records operator-approved exact department/section membership for direct targeting.
 
 Signup never provisions a profile or assigns a role. There is no auth-user trigger,
 browser role selector, self-promotion endpoint, or email-domain-to-role mapping.
@@ -55,7 +57,42 @@ The API uses 401/403/503 status codes; the HTML page can render a denial/service
 with HTTP 200, but includes no profile data on those paths. Unit tests and config-free
 smoke checks do not prove database isolation or successful authenticated flows.
 
-## Future academic policy — provisional and not implemented
+## Milestone 3A Activity permissions
+
+No role name automatically grants creation, reading or verification. A trusted operator
+must approve a row in activity_capabilities for a specific responsibility_id/category_key,
+with can_create and/or can_verify. Both default false. An expired/future responsibility,
+inactive profile, wrong scope or wrong category denies access even if another role is valid.
+The app has no capability/membership provisioning endpoint. The tests provision only
+temporary fixtures; no standing staff grants were seeded by the migration.
+
+- An active student can read only assigned activities and their own assignment,
+  completion and assignment events. They can report only their own pending assignment
+  during the configured submission window, and cannot verify or browse other students.
+- A staff member with a current create capability may create within that exact scope
+  and category only after every active student has a current exact-scope membership.
+- A staff member with either create or verify capability can read activities, assigned
+  student UUIDs, completion and history within that exact scope/category, including work
+  created by another authorized staff member there. This does not reveal student profiles
+  or an unassigned roster. Creator ownership alone does not preserve access after revocation.
+- A verify capability permits reported → verified only when verification is required.
+  Create capability alone is insufficient. No pending → verified or self-review exists.
+- Staff with only counselor/HOD/admin or another role name have no Activity authority.
+  Capabilities are never combined across responsibility scopes or categories.
+
+Direct client writes to all seven new tables are revoked. The three mutation RPCs
+perform authorization explicitly and save history atomically. Read RLS still applies
+to direct REST queries. Privileged database owners/service-role operators can bypass
+these boundaries; audit history is append-only for application users, not tamper-proof
+against database administrators. Operator provisioning audit tooling remains future work.
+
+Membership is checked at publication; existing assignments are durable after membership
+expiry. Current staff capability controls staff reads; profile activation controls all
+student reads. No hierarchy inheritance or group expansion is implemented.
+
+See [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) for examples, API errors and remaining limits.
+
+## Future role-to-capability policy — provisional and not implemented
 
 | Responsibility        | Proposed capability and scope                                                                                  |
 | --------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -80,8 +117,7 @@ Retention, evidence access, exports, consent and break-glass access remain undec
 
 ## Verification required
 
-Automated pgTAP policy tests and genuine local Auth/HTTP/REST integration tests are
-authored, but real execution is blocked by unavailable Docker/Supabase/PostgreSQL tools.
-The tests distinguish SQL role contexts from genuine Auth login. Verify anonymous
-denial, cross-user isolation, role mutation denial, inactive/unprovisioned denial,
-malformed sessions, logout and visible database failures before using real student data.
+Automated pgTAP and genuine local Auth/HTTP/REST integration tests have been executed.
+The tests distinguish SQL role contexts from genuine Auth login. See PROJECT_STATUS
+for counts, commands and failures. These local results do not establish production
+readiness or approve the future college role-to-capability policy above.

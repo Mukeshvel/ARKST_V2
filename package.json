@@ -18,6 +18,8 @@
     "test:watch": "vitest",
     "test:smoke": "node scripts/smoke.mjs",
     "test:identity": "node scripts/test-local-identity.mjs",
+    "test:activities": "node scripts/test-local-activities.mjs",
+    "test:local": "node scripts/run-local-verification.mjs",
     "test:rls": "supabase test db --local",
     "supabase:start:identity": "supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build"

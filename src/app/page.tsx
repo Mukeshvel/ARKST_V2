@@ -5,7 +5,7 @@ export default function Home() {
     <main>
       <header>
         <span className="brand">ARKST</span>
-        <span className="badge">Milestone 02 · Identity foundation</span>
+        <span className="badge">Milestone 3A · Activity API</span>
       </header>
       <section aria-labelledby="intro">
         <p className="eyebrow">Academic operations</p>
@@ -32,23 +32,24 @@ export default function Home() {
           <p className="eyebrow">Local configuration required</p>
           <h2>Identity &amp; storage</h2>
           <p>
-            Supabase session and profile code is implemented. Real database
-            verification requires an isolated local Supabase stack. No live
-            academic data is displayed here.
+            Identity and Activity APIs have passed isolated local database
+            tests. A configured local Supabase stack is required to use them. No
+            live academic data is displayed here.
           </p>
           <Link href="/login">Local identity sign-in</Link>
         </article>
         <article>
-          <p className="eyebrow">Planned</p>
-          <h2>Academic workflows</h2>
+          <p className="eyebrow">API implemented</p>
+          <h2>Direct activities</h2>
           <p>
-            Activity creation, targeting, completion, verification and
-            announcements will be implemented in later milestones.
+            Authorized direct assignment, completion reporting and staff
+            verification persist in PostgreSQL. Dashboards, group targeting and
+            announcements remain future work.
           </p>
         </article>
       </section>
       <footer>
-        No live academic data. Academic workflows are not implemented.
+        No live academic data. This page is a development status page.
       </footer>
     </main>
   );

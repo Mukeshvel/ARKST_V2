@@ -6,7 +6,7 @@ const response = await fetch(origin);
 assert.equal(response.status, 200);
 assert.match(response.headers.get('content-type') ?? '', /text\/html/);
 const html = await response.text();
-assert.match(html, /Milestone 02/);
+assert.match(html, /Milestone 3A/);
 assert.match(html, /not a functioning academic dashboard/);
 assert.match(html, /No live academic data/);
 assert.doesNotMatch(html, /<button|<form|<input/);

@@ -10,20 +10,17 @@ and Kong services with normal health checks. Realtime's image was pulled during 
 but its container was explicitly stopped/excluded. The four running containers used
 about 275 MiB at the final sample. No memory-limit changes or experimental CLI features.
 
-The 36 pgTAP assertions passed against this isolated stack. The real Auth suite then
-failed at initial email/password sign-in with `email_provider_disabled`: the current
-`auth.email.enable_signup = false` disables the email provider. The separate global
-`auth.enable_signup = false` also remains set. No provider-config adjustment was made
-because automatic review requested user approval. Until it is approved, real app/Auth
-integration is unverified. See PROJECT_STATUS.md for the full command/result record.
+The initial Auth run failed with email_provider_disabled. The user then approved
+auth.email.enable_signup=true while retaining global auth.enable_signup=false.
+All 12 real identity groups passed, including an actual signup attempt denied with
+signup_disabled. Milestone 3A keeps that configuration and regresses the identity suite.
+See PROJECT_STATUS.md and ACTIVITY_ENGINE.md for current commands and results.
 
 ## Current evidence and prerequisites
 
-At Milestone 2 inspection, `docker`, `supabase` and `psql` were not available on PATH,
-and the standard Docker installation directory was absent. No system-level tools
-were installed, no remote database was accessed, and no database/auth tests have been
-claimed as passing. The SQL below is implemented source pending execution on a real
-isolated Supabase stack. Check PROJECT_STATUS for the final verification record.
+Docker and the project-local Supabase CLI are now installed. Both migrations and real
+Auth/SQL suites have run on the isolated local stack. Historical prerequisite failures
+are retained in MILESTONE_2_1_STATUS.md; PROJECT_STATUS records current evidence.
 
 A running, user-approved Docker-compatible container runtime and a supported Supabase
 CLI are prerequisites. Follow the official [local development guide](https://supabase.com/docs/guides/local-development)
@@ -34,15 +31,15 @@ when enabling this environment. Do not use a remote database as a substitute.
 
 Run from this repository, after the prerequisites are available:
 
-```sh
-supabase start
-supabase db reset --local
-supabase test db --local
-supabase status
+```powershell
+$env:SUPABASE_HOME = Join-Path (Get-Location) '.supabase-home'
+npm run supabase:start:identity
+npx supabase migration up --local
+npm run test:rls
 ```
 
-`db reset --local` deletes and recreates this project's local database; it is intended
-only for this isolated development project. Preserve local work before resetting.
+The documented flow applies pending migrations without deleting the local volume.
+`db reset --local` deletes/recreates the database and is not part of this flow.
 The project ID is `arkst-v2-identity-local`; API/DB/Studio ports are 54321/54322/54323.
 Keep local ports restricted to the development machine. Do not run `supabase link`,
 `db push`, use `--linked`, or supply a remote `--db-url` in this milestone.
@@ -75,9 +72,9 @@ teacher, counselor and placement-coordinator responsibilities concurrently, subj
 trusted organizational policy. A name, email suffix, Auth metadata or frontend field
 never provisions authority. There is deliberately no `auth.users` provisioning trigger.
 
-Authenticated callers have SELECT privileges only, further restricted by RLS:
+On the identity tables, authenticated callers have SELECT privileges only, restricted by RLS:
 own active profile, own currently valid responsibilities, and their exact scopes.
-No table privilege or RLS policy permits browser/API insertion, update or deletion,
+No identity table privilege or RLS policy permits browser/API insertion, update or deletion,
 even when an application `admin` role exists. An application admin is not PostgreSQL's
 `service_role` and cannot bypass RLS. Inactive and unprovisioned identities both have
 no visible profile; the app must describe that denial without claiming which hidden
@@ -136,9 +133,11 @@ integration suite must authenticate through genuine local Supabase Auth and exer
 HTTP requests and direct database API requests. Neither suite may be reported as
 passed until actually executed. Unit-test stubs are not substitutes for either suite.
 
-The migration is forward-only. For this disposable local environment, reset/reapply
-is the recovery path. A production rollback/backup procedure and production deployment
-are outside this milestone.
+Migrations are forward-only. Milestone 3A adds 20261027000100_activity_engine.sql,
+seven Activity/provisioning tables and three explicitly authorized mutation RPCs.
+It does not alter the identity tables or their policies. ACTIVITY_ENGINE.md documents
+the additional trusted provisioning needed before ordinary staff can create work.
+No database reset was needed. Production rollback/backup procedures remain out of scope.
 
 References: [RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security),
 [database testing](https://supabase.com/docs/guides/database/testing), and

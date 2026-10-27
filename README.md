@@ -1,9 +1,10 @@
-# ARKST — identity foundation
+# ARKST — secure Activity engine
 
-Milestone 1 foundation is preserved. Milestone 2 adds real Supabase identity code
-and SQL migrations, but **live Auth/RLS integration is not yet verified** because
-Docker and Supabase CLI are unavailable in the implementation environment.
-There is no academic dashboard, activity workflow or fake connected service.
+Milestones 1 and 2.1 are preserved. Milestone 3A adds a real PostgreSQL Activity API
+with direct assignments, completion, optional staff verification and actor history.
+Identity and Activity integration suites have passed against isolated local Supabase.
+There is no academic dashboard. See [PROJECT_STATUS](docs/PROJECT_STATUS.md) for evidence
+and [ACTIVITY_ENGINE](docs/ACTIVITY_ENGINE.md) for the API and permission boundaries.
 
 Use Node.js 24 LTS and npm:
 
@@ -31,24 +32,30 @@ npm run test:smoke
 ```
 
 `check` runs format, strict type checks, lint, pure unit/guard tests and production
-build. It does not substitute for the two real database suites:
+build. It does not substitute for the real database suites. On Windows PowerShell,
+with the existing isolated local stack running:
 
-```sh
+```powershell
+$env:SUPABASE_HOME = Join-Path (Get-Location) '.supabase-home'
+npx supabase migration up --local
 npm run test:rls
-npm run test:identity
+$env:APP_ENV = 'local'
+$env:LOCAL_IDENTITY_TESTS = '1'
+npm run test:local
 ```
 
-These require an already installed CLI/running isolated stack, migrations and explicit
-local test configuration. They fail rather than skip-pass when prerequisites are absent.
+The local runner reads generated local keys into memory, starts a production Next server
+on an ephemeral loopback port, runs smoke/identity/Activity suites, then stops that server.
+Admin credentials are omitted from the app environment. Tests fail when prerequisites are absent.
 See [IDENTITY_TESTS](docs/IDENTITY_TESTS.md). Set `SMOKE_ORIGIN` for another local port.
 `npm run format` applies formatting; `npm run test:watch` runs Vitest in watch mode.
 
 ## Source map
 
-- `src/app`: foundation, login and protected profile UI; login/logout and own-profile API.
+- `src/app`: status, login/profile UI; identity and Activity APIs.
 - `src/proxy.ts`: cookie refresh and private response headers; not a permission bypass.
 - `src/auth`: server-only Supabase clients, verified identity, request/error handling.
-- `src/data`: own-profile and responsibility queries using the user's session and RLS.
+- `src/data`: identity/Activity queries and mutation RPCs using the user's session.
 - `src/core`: preserved framework-free activity rules and tests.
 - `src/config`: origin/service configuration validation and tests.
 - `supabase`: local config, reproducible migration and pgTAP policy tests.
@@ -57,6 +64,6 @@ See [IDENTITY_TESTS](docs/IDENTITY_TESTS.md). Set `SMOKE_ORIGIN` for another loc
 
 Start subsequent sessions with [PROJECT_STATUS](docs/PROJECT_STATUS.md), then read
 [DECISIONS](docs/DECISIONS.md) and [PERMISSIONS](docs/PERMISSIONS.md). Scope stops at
-Milestone 2. Do not treat authored SQL or tests as executed. No remote resources,
+Milestone 3A. Do not treat authored SQL or tests as executed. No remote resources,
 production migrations, deployments, commits or pushes were made. Zero paid
 infrastructure remains a target; hosted capacity/recovery requirements are undecided.

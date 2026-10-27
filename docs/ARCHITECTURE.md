@@ -8,19 +8,19 @@ Initial scale: approximately 130 students and 50 staff; no microservices or mono
 Milestone 1's public foundation page and pure completion/window rules are preserved.
 Milestone 2 adds real Supabase Auth integration code, a protected own-profile page,
 an own-profile API, session handling, SQL migrations and executable identity/RLS tests.
-The SQL and successful authentication flows have **not been executed locally** because
-Docker, Supabase CLI and PostgreSQL tools are unavailable. Implemented code is not
-evidence of a working database connection. See PROJECT_STATUS for executed checks.
+Milestone 2.1 verified these flows against local Supabase. Milestone 3A adds the shared
+Activity API and transactional PostgreSQL operations. See PROJECT_STATUS for executed
+regression checks and [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) for the complete API contract.
 
 - `src/app`: public status page, local login form, protected profile rendering and
   `/auth/login`, `/auth/logout`, `/api/me` route handlers.
 - `src/auth`: server-only cookie clients, verified identity lookup and safe error handling;
   pure request validation utilities support bounded forms and same-origin mutations.
-- `src/data`: own-profile and responsibility queries using the caller's session.
+- `src/data`: own-profile, responsibility and Activity queries using the caller's session.
 - `src/config`: application-origin and identity configuration validation.
 - `src/proxy.ts`: Next.js 16 session refresh and private response cache headers.
 - `src/core`: framework-free completion accounting and configurable window rules.
-- `supabase`: unapplied identity migration, isolated local config and pgTAP policy tests.
+- `supabase`: applied local identity/Activity migrations, local config and pgTAP security tests.
 - `tests/integration` and `scripts/test-local-identity.mjs`: genuine local Auth/HTTP/REST
   tests that require an explicitly isolated local stack; no substitute login is provided.
 
@@ -57,7 +57,8 @@ client and no application service-role client.
 
 Private responses use `private, no-store` cache controls. No role claims from account
 metadata, browser fields or email naming patterns confer authorization. Displaying
-responsibilities does not grant academic capabilities in this milestone.
+responsibilities does not grant academic capabilities. Activity capabilities require
+explicit trusted provisioning tied to one responsibility and category.
 
 ## Integration boundaries and constraints
 
@@ -72,19 +73,37 @@ so a future provider can reuse the same profile/role model. Google OAuth, hosted
 and hosted onboarding are not enabled or tested. Supabase local signup is disabled.
 No remote database has been connected, migrated, deployed or provisioned.
 
-Before hosting: execute real authentication/RLS tests, verify refresh and logout in a
+Before hosting: repeat authentication/RLS tests in an approved environment, verify refresh and logout in a
 browser, configure approved onboarding/provider policy, and assess abuse controls,
 retention, backup/recovery and operational monitoring. Follow [LOCAL_SUPABASE](LOCAL_SUPABASE.md)
-for the isolated setup after system prerequisites are approved and installed.
+for the installed isolated setup.
+
+## Milestone 3A Activity flow
+
+Activity routes use the existing identity check, server cookie client and private response
+headers. Mutations require the exact Origin, bounded JSON and strict field validation.
+The data module invokes three transactional RPCs using the caller's JWT: create, submit,
+verify. The app never uses a database owner or service-role key.
+
+RPCs explicitly authorize the caller using current active profiles and provisioned
+capabilities. Creation validates all exact-scope student memberships before writing
+activities, assignments and history in one transaction. Submission and verification lock
+the assignment row and commit the completion and actor event together. PostgreSQL
+constraints enforce uniqueness, valid timestamps and completion shape. Direct client
+table mutations are revoked, including history edits. Read RLS filters activities,
+assignments, completion and history independently, including nested REST requests.
+
+Privileged functions pin an empty search path, qualify relations and derive the actor
+from auth.uid(). Four helpers are in a schema not exposed by PostgREST. Only the three
+intentional mutation RPCs are exposed; anonymous execution is revoked. Membership
+and capability tables have no ordinary-client grants or management routes.
 
 ## Future academic workflows — not implemented
 
-Each future mutation must validate payloads and transitions, authorize every target,
-and enforce matching RLS. Persist writes and audit events atomically; use unique
-assignment keys and concurrency controls. Return success only after a confirmed
-commit and refresh only the affected user-scoped views. General workflow authorization,
-audit trails, groups/memberships, activity creation, scheduling generation, announcements,
-follow-up, notifications and catch-up remain future work.
+Groups/dynamic membership, recurrence generation, activity editing/cancellation,
+announcements, notifications, counselor follow-up and catch-up remain future work.
+They can reference the same Activity and assignment IDs. Group targeting is rejected,
+not expanded into simulated recipients. No teacher/student dashboard is implemented.
 
 References: [Supabase Next.js SSR guidance](https://supabase.com/docs/guides/auth/server-side/creating-a-client),
 [SSR stability status](https://supabase.com/docs/guides/auth/server-side),

@@ -2,8 +2,7 @@
 
 ## Milestone 2 identity schema
 
-The versioned SQL migration defines the following tables. It has not been applied or
-executed against a real database here because local prerequisites are unavailable.
+The versioned identity migration defines the following locally verified tables.
 
 | Table                        | Relationships and constraints                                                                                                                                                                                                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,14 +18,41 @@ Responsibility names are teacher, counselor, coordinator, placement coordinator,
 coordinator, HOD and admin. Classification is separate from these responsibilities.
 
 Responsibility intervals are start-inclusive/end-exclusive, with null end meaning no
-scheduled end. The schema does not yet record a grantor/audit event, student scope
-membership, or dual student/staff status. Parent links do not validate arbitrary long
+scheduled end. The identity schema does not yet record a grantor/audit event or dual
+student/staff status. Milestone 3A adds exact student scope membership. Parent links do not validate arbitrary long
 cycles or parent-kind relationships; no traversal uses them in this milestone.
 
-## Proposed academic model — not implemented
+## Milestone 3A shared Activity schema
+
+Seven tables are implemented by 20261027000100_activity_engine.sql:
+
+| Table                     | Purpose                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| activity_categories       | Extensible category keys; seven initial categories, no per-category workflow tables.                                                       |
+| student_scope_memberships | Trusted, dated student membership used for exact department/section targeting.                                                             |
+| activity_capabilities     | Explicit create/verify approval attached to one existing responsibility and category.                                                      |
+| activities                | One concrete scheduled activity with title, description, scope, category, start/deadline/end, verification flag and authenticated creator. |
+| activity_assignments      | Durable direct target; unique activity/student pair, actor and assignment timestamp.                                                       |
+| activity_completions      | Zero or one per assignment; absence is pending, then reported, optionally verified with a distinct actor/time.                             |
+| activity_history          | Transactional created/assigned/reported/verified events; actor, server time and references.                                                |
+
+There is no draft/edit/cancel flow. Creation publishes all direct assignments atomically.
+Each Activity is a concrete occurrence; future schedule generation can create these same
+rows with a schedule reference. No fixed weekly test count, recurrence generator or
+group-membership evaluator exists. The assignment ID remains suitable for future
+follow-up, notification and catch-up references. Current requests support 1–500 unique
+students as a technical bound, and list/history reads use 50-row pages.
+
+The existing completion accounting is preserved: reported is complete only when
+verification is not required; verified is complete. Submission never sets verified.
+Both submission and review lock the assignment. No resubmission/rejection/reopening
+transition is currently supported. See [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md).
+
+## Broader proposed academic model
 
 The table below preserves the broader design. Identity proposals are partly realized
-above; all academic entities/workflows, richer organization structure and audit history
+above. The shared Activity/assignment/completion/history subset is now implemented as
+described above; groups, recurring schedules, announcements and broader governance
 remain proposals. IDs are server-generated; timestamps are UTC instants.
 
 | Entity                   | Relationships and purpose                                                                                                |
@@ -67,7 +93,9 @@ Holiday handling, makeup windows and recurrence changes require college decision
 
 Implemented provisional rule: opensAt ≤ now < dueAt is open; equal/reversed windows
 and invalid instants are rejected. The function classifies a window, not permission
-to submit. Late submission policy is undecided. Pass server time in future workflows.
+to submit. The Activity RPC enforces this boundary with database transaction time.
+An explicit end must be at or after the deadline; an end after the deadline does not
+enable late submission. Late submission policy remains undecided.
 
 Implemented accounting: pending is incomplete; reported is complete only if verification
 is not required; verified is complete. These functions do not authorize transitions.
