@@ -133,10 +133,38 @@ RLS-filtered reads for the faculty view. The counselor roster endpoint now retur
 flow signs in through Supabase Auth, publishes, reports completion, reloads, and
 checks the creator and counselor views. See PROJECT_STATUS for executed results.
 
+## Milestone 4 operational flow
+
+`eligible_activity_students` exposes a bounded name/roll picker only where the
+current caller has exact section CREATE authority. `create_selected_activity`
+checks every selected active linked roster student and current membership; a
+counseling-only request additionally checks current administrator-created
+mapping. It writes the existing Activity, section snapshot, per-student
+assignments and actor history. Section-wide publication and the original direct
+target RPC remain available. All Activity categories share the same engine.
+
+Creator monitoring retains its full-set counts and 50-row result pages.
+Counselor summary/detail RPCs aggregate all currently mapped active students
+for each Activity, even when another staff member created it. A separate
+scoped `pending_students_text` RPC builds the complete authorized pending list
+in the database for the clipboard action; it never uses only the visible page.
+Progress bars calculate percentages from these complete counts.
+
+Announcements have their own message, section/recipient snapshot and
+creator/timestamp fields. They do not create Activity obligations. Publication
+requires the existing explicit `general` CREATE capability for every target
+section, with a current mapping check for counseling mode. Assignment and
+announcement-recipient insert triggers write one notification per source and
+recipient, followed by one outbox event, in the publication transaction.
+Unique keys make repeated event processing idempotent. Student inbox SELECT
+is protected by recipient RLS; read state changes through a caller-checked RPC.
+The browser refreshes inbox data on focus/visibility. The outbox has no worker
+yet, so no desktop push or offline delivery is claimed.
+
 ## Future academic workflows — not implemented
 
 Groups/dynamic membership, recurrence generation, activity editing/cancellation,
-announcements, notifications, counselor follow-up and catch-up remain future work.
+desktop push, counselor follow-up delivery and catch-up remain future work.
 They can reference the same Activity and assignment IDs. Group targeting is rejected,
 not expanded into simulated recipients. Reviewer verification remains an API operation;
 the current dashboards display accurate read-only review status.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { Activity, Assignment, HistoryEvent } from '../dashboard-data';
 import {
   activityState,
@@ -160,7 +161,13 @@ function StudentActivity({
   );
 }
 
-export function StudentDashboard({ studentId }: { studentId: string }) {
+export function StudentDashboard({
+  studentId,
+  focusedActivityId,
+}: {
+  studentId: string;
+  focusedActivityId?: string | undefined;
+}) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -175,12 +182,17 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
       setLoading(true);
       setError('');
       try {
-        const body = await dashboardJson<{ activities: Activity[] }>(
-          `/api/activities?offset=${nextOffset}`,
-        );
-        if (!Array.isArray(body.activities))
+        const body = focusedActivityId
+          ? await dashboardJson<{ activity: Activity }>(
+              `/api/activities/${focusedActivityId}`,
+            )
+          : await dashboardJson<{ activities: Activity[] }>(
+              `/api/activities?offset=${nextOffset}`,
+            );
+        const loaded = 'activities' in body ? body.activities : [body.activity];
+        if (!Array.isArray(loaded))
           throw new Error('Activities are unavailable.');
-        for (const activity of body.activities) {
+        for (const activity of loaded) {
           if (
             !Array.isArray(activity.assignments) ||
             activity.assignments.some((a) => a.student_id !== studentId)
@@ -189,7 +201,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
               'Assigned activity data did not match your account.',
             );
         }
-        setActivities(body.activities);
+        setActivities(loaded);
         setOffset(nextOffset);
       } catch (cause) {
         setActivities([]);
@@ -202,7 +214,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
         setLoading(false);
       }
     },
-    [studentId],
+    [studentId, focusedActivityId],
   );
 
   useEffect(() => {
@@ -266,6 +278,11 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
   return (
     <section aria-label="Assigned activities">
+      {focusedActivityId && (
+        <p>
+          <Link href="/dashboard/student">All my activities</Link>
+        </p>
+      )}
       <div className="dashboard-toolbar">
         <p className="dashboard-muted">
           {loading
@@ -327,7 +344,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
             : 'No activities are assigned to your account on this page.'}
         </p>
       )}
-      {(!error || activities.length > 0) && (
+      {!focusedActivityId && (!error || activities.length > 0) && (
         <div className="dashboard-actions dashboard-pagination">
           <button
             className="dashboard-secondary"

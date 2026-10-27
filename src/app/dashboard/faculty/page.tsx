@@ -1,6 +1,7 @@
 import { DashboardNav } from '../dashboard-nav';
 import { dashboardIdentity, DashboardFailure } from '../identity';
 import { FacultyDashboard } from './faculty-dashboard';
+import { AnnouncementComposer } from './announcement-composer';
 
 export const dynamic = 'force-dynamic';
 export default async function FacultyPage() {
@@ -24,6 +25,7 @@ export default async function FacultyPage() {
         </p>
       </div>
       <FacultyDashboard />
+      <AnnouncementComposer />
     </main>
   );
 }

@@ -20,6 +20,7 @@
     "test:identity": "node scripts/test-local-identity.mjs",
     "test:activities": "node scripts/test-local-activities.mjs",
     "test:directory": "node scripts/test-local-directory.mjs",
+    "test:operations": "node scripts/test-local-operations.mjs",
     "test:directory-admin": "node scripts/directory-admin.mjs",
     "test:local": "node scripts/run-local-verification.mjs",
     "test:rls": "supabase test db --local",

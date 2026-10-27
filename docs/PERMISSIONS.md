@@ -137,6 +137,34 @@ Dashboard navigation may show faculty and counselor links for one staff account,
 all data requests still pass the existing server session checks and RLS or scoped RPCs.
 The faculty result screen is read only, including for a creator without VERIFY.
 
+## Milestone 4 targeting, announcement and inbox boundary
+
+Selected-student candidate search returns only names, roll identifiers and
+sections of active linked roster students in the caller's current category
+CREATE scope. It does not expose email or unrelated private records. Publishing
+rechecks every selected student; counseling mode also requires each current
+trusted counselor mapping. A counselor role by itself grants no CREATE,
+department-wide targeting, general roster read or VERIFY. Creator monitoring
+still requires current authority, while counselor results include only current
+mapped active students regardless of creator.
+
+Announcements require an explicit `general` category CREATE capability for
+every selected section. Their recipients are active, linked, currently
+eligible roster students. The message creates no Activity assignment or
+pending completion. Recipient snapshots and notification rows are immutable to
+ordinary clients; creator/recipient announcement SELECT and own-notification
+SELECT are protected by RLS. A notification can be marked read only by its
+active recipient through a same-origin, session-checked RPC. The authenticated
+client has no direct INSERT/UPDATE/DELETE grant on those tables or access to
+the private outbox.
+
+Notification/outbox inserts occur in the same transaction as Activity or
+announcement publication. A failure rolls back the whole publication. The
+unique `(recipient_id, source_kind, source_id)` key prevents duplicate inbox
+records for repeated processing of the same source. Desktop push has no worker
+or delivery claim in this milestone. A database owner remains a trusted
+privileged operator outside RLS.
+
 ## Future role-to-capability policy — provisional and not implemented
 
 | Responsibility        | Proposed capability and scope                                                                                  |

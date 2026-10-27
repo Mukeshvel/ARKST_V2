@@ -3,7 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   ActivityError,
   activityInput,
+  announcementInput,
+  candidateInput,
   sectionActivityInput,
+  selectedActivityInput,
 } from '@/core/activity-input';
 
 function result<T>({
@@ -196,4 +199,144 @@ export async function changeCompletion(
       'Completion result is unavailable. Reload before retrying.',
     );
   return { completion };
+}
+
+export async function eligibleActivityStudents(
+  client: SupabaseClient,
+  input: ReturnType<typeof candidateInput>,
+) {
+  return result(await client.rpc('eligible_activity_students', input));
+}
+
+export async function createSelectedActivity(
+  client: SupabaseClient,
+  input: ReturnType<typeof selectedActivityInput>,
+) {
+  const created = result(await client.rpc('create_selected_activity', input));
+  if (
+    !created ||
+    typeof created !== 'object' ||
+    typeof (created as { id?: unknown }).id !== 'string' ||
+    typeof (created as { assignedCount?: unknown }).assignedCount !== 'number'
+  )
+    throw new ActivityError(
+      503,
+      'Publication result is unavailable. Reload before retrying.',
+    );
+  return created;
+}
+
+export async function monitorCounselorActivity(
+  client: SupabaseClient,
+  id: string,
+  offset: number,
+) {
+  return result(
+    await client.rpc('monitor_counselor_activity', {
+      p_activity: id,
+      p_offset: offset,
+    }),
+  );
+}
+
+export async function counselorActivitySummaries(
+  client: SupabaseClient,
+  offset: number,
+) {
+  return result(
+    await client.rpc('counselor_activity_summaries', { p_offset: offset }),
+  );
+}
+
+export async function pendingStudentsText(
+  client: SupabaseClient,
+  id: string,
+  counselorView: boolean,
+) {
+  const pending = result(
+    await client.rpc('pending_students_text', {
+      p_activity: id,
+      p_counselor_view: counselorView,
+    }),
+  );
+  if (
+    !pending ||
+    typeof pending !== 'object' ||
+    typeof (pending as { text?: unknown }).text !== 'string' ||
+    typeof (pending as { count?: unknown }).count !== 'number'
+  )
+    throw new ActivityError(
+      503,
+      'Pending list is unavailable. Nothing was copied.',
+    );
+  return pending;
+}
+
+export async function publishAnnouncement(
+  client: SupabaseClient,
+  input: ReturnType<typeof announcementInput>,
+) {
+  const published = result(await client.rpc('publish_announcement', input));
+  if (
+    !published ||
+    typeof published !== 'object' ||
+    typeof (published as { id?: unknown }).id !== 'string' ||
+    typeof (published as { recipientCount?: unknown }).recipientCount !==
+      'number'
+  )
+    throw new ActivityError(
+      503,
+      'Announcement result is unavailable. Reload before retrying.',
+    );
+  return published;
+}
+
+export async function getAnnouncement(client: SupabaseClient, id: string) {
+  const announcement = result(
+    await client
+      .from('announcements')
+      .select('id,title,message,created_at,created_by')
+      .eq('id', id)
+      .maybeSingle(),
+  );
+  if (!announcement)
+    throw new ActivityError(404, 'Announcement is unavailable.');
+  return { announcement };
+}
+
+export async function listNotifications(
+  client: SupabaseClient,
+  offset: number,
+) {
+  const response = await client
+    .from('notifications')
+    .select('id,source_kind,source_id,title,message,created_at,read_at', {
+      count: 'exact',
+    })
+    .order('created_at', { ascending: false })
+    .order('id')
+    .range(offset, offset + 49);
+  const notifications = result(response);
+  if (response.count === null)
+    throw new ActivityError(503, 'Notification count is unavailable.');
+  const unreadResponse = await client
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .is('read_at', null);
+  result(unreadResponse);
+  if (unreadResponse.count === null)
+    throw new ActivityError(503, 'Unread count is unavailable.');
+  return {
+    notifications,
+    total: response.count,
+    unread: unreadResponse.count,
+    offset,
+    pageSize: 50,
+  };
+}
+
+export async function markNotificationRead(client: SupabaseClient, id: string) {
+  return result(
+    await client.rpc('mark_notification_read', { p_notification: id }),
+  );
 }

@@ -19,7 +19,9 @@ async function main() {
     'Require explicit LOCAL_IDENTITY_TESTS=1',
   );
   const suite = process.argv[2] ?? 'all';
-  assert.ok(['all', 'identity', 'activity', 'directory'].includes(suite));
+  assert.ok(
+    ['all', 'identity', 'activity', 'directory', 'operations'].includes(suite),
+  );
   const { stdout } = await execute(
     process.execPath,
     ['node_modules/supabase/dist/supabase.js', 'status', '--output', 'json'],
@@ -120,6 +122,8 @@ async function main() {
       await run('scripts/test-local-activities.mjs');
     if (suite === 'all' || suite === 'directory')
       await run('scripts/test-local-directory.mjs');
+    if (suite === 'all' || suite === 'operations')
+      await run('scripts/test-local-operations.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');

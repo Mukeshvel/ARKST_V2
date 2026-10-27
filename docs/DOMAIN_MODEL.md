@@ -122,3 +122,22 @@ See [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md) for CSV and API data flows.
 
 Announcements use the same scoped audience concepts. Follow-up history and future
 escalations reference assignments, rather than independent per-category databases.
+
+## Milestone 4 informational and notification records
+
+The selected-student mode resolves real roster identities into the same
+`activities` and `activity_assignments` tables. `activity_target_sections`
+records the section snapshot for scoped creator monitoring. Counseling-only
+selection additionally checks a current trusted mapping; mappings are never
+stored as a new Activity category or copied into a parallel completion pool.
+
+`announcements` stores title, message, creator and creation time.
+`announcement_target_sections` and `announcement_recipients` preserve the
+published audience snapshot. They have no completion state and cannot cancel
+or rewrite Activities. `notifications` stores one durable recipient/source
+message and read timestamp for each new Activity assignment or announcement.
+`notification_outbox` stores one event per notification for future delivery;
+`processed_at` remains unset until a real worker is implemented. The unique
+recipient/source key and outbox notification key are idempotency boundaries.
+Deleting a deprovisioned account removes its private inbox and outbox entries;
+Activity and announcement history are separate.

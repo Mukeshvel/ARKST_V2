@@ -253,3 +253,21 @@ The counselor dashboard uses the current mapping RLS endpoint (now paginated) an
 the existing shared Activity/completion monitor. It cannot edit mapping or completion
 records. Each screen checks the real session; its API enforces the underlying scope.
 The UI adds no academic role policy, separate test engine or completion pool.
+
+## Milestone 4 selected audiences and monitoring
+
+The selected-student publication route uses current, CREATE-approved roster
+candidates. Choosing counseling mode additionally restricts every student to
+the caller's current trusted counselor mapping; it does not create a capability.
+Publication saves a section-snapshot Activity with existing assignments,
+completions and history. Section-wide and original direct-student operations
+remain intact. Students only report status for external work through the
+existing completion transition.
+
+Creator and counselor result pages show complete database totals and paged
+student rows. The pending-copy RPC computes the entire authorized pending
+audience, independent of page offset, and rejects output over 100,000
+characters rather than copying a partial list. The progress bar counts
+self-reported, awaiting-verification and verified states as reports; those
+states remain separate in the displayed totals. Announcement messages are
+separate from Activity obligations; see ARCHITECTURE and PERMISSIONS.

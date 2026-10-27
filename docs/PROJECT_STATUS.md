@@ -1,4 +1,4 @@
-# Project status — through Milestone 3B-2B, 2026-10-27
+# Project status — through Milestone 4, 2026-10-27
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -222,3 +222,89 @@ verification remains the existing authorized API operation. Group targeting,
 notifications, recurrence, catch-up, hosted OAuth and production load/concurrency
 behavior remain outside this milestone. This local verification is not a production
 readiness claim.
+
+## Milestone 4 — first operational experience, 2026-10-27
+
+The starting repository was clean `main` at `5cc03ac`, equal to `origin/main`.
+Work is isolated on `codex/milestone-4` and remains uncommitted. No remote
+Supabase connection, database reset, deployment, push, merge or actual roster
+import occurred. Existing identity, Activity, completion and directory models
+were retained.
+
+Faculty can publish one Activity to authorized Section A/B audiences or select
+named eligible students from a bounded search over active linked roster rows.
+The selected path records the chosen sections, creates the usual Activity,
+assignments and history, and rechecks CREATE authority at publication. The
+optional counseling audience also requires a current trusted mapping for each
+student; counseling alone does not grant CREATE. Student work remains external
+to ARKST. The student dashboard reports status through the existing completion
+RPC and reloads the saved record.
+
+Creator results and counselor detail show actual names, roll identifiers,
+states and full-set completion counts. A progress bar uses complete authorized
+database totals. Copy Pending Students obtains the entire authorized pending
+set from one scoped database query, including rows beyond the 50-row display
+page. The browser test verified a 58-student pending list while only 50 result
+rows loaded. Counselor summary and detail counts include only currently mapped
+active students, even for Activities published by another teacher.
+
+Announcements are separate informational records and recipient snapshots;
+they never create an Activity assignment or change an existing Activity. A
+current `general` category CREATE approval for each addressed section is the
+explicit publication authority. Activity assignments and announcement
+recipients insert durable per-user inbox rows and outbox rows in the same
+PostgreSQL transaction. Unique recipient/source keys prevent duplicate event
+records. The inbox has own-recipient RLS, read/unread persistence, authorized
+source links, pagination and refresh on focus/visibility. `processed_at` is
+unused: desktop push and offline delivery have **not** been implemented.
+
+Forward-only local migrations were applied in order: `00800` selected targets,
+candidate search, counselor detail and full pending-copy query; `00900`
+announcements, notifications and transactional outbox; `01000` complete
+counselor Activity summaries; `01100` per-row counselor status fields; `01200`
+private inbox cleanup when a test/deprovisioned account is removed. Existing
+migrations were not edited. `operations_security.test.sql` adds database RLS,
+grant, SECURITY DEFINER/search-path, trigger and uniqueness assertions.
+
+| Command                                                                                           | Actual result                                                                                                                       |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --local` | PASS: applied `00800`–`01200` to the existing local database without reset.                                                         |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`                  | PASS: 4 pgTAP files, 213 assertions.                                                                                                |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- operations`           | PASS: 9 real Auth/PostgreSQL/API/Edge groups and synthetic cleanup.                                                                 |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- directory`            | PASS: 20 prior directory groups and browser flow after scoping selectors to the Activity form.                                      |
+| `npm run check` (approved local process access)                                                   | PASS: formatting, typecheck, ESLint, 100 Vitest tests, 10 helper safety tests and production build.                                 |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                         | PASS final rerun: health-gated smoke, 12 identity, 16 Activity, 20 directory and 9 Milestone 4 groups; synthetic cleanup succeeded. |
+
+The Edge walkthrough used real synthetic Auth users. It selected six named
+students, double-clicked publication and checked one saved Activity, viewed a
+recipient inbox on a mobile viewport, reported completion and reloaded,
+confirmed creator/counselor states and percentages, copied the counselor's
+complete pending list through the browser clipboard, and published a no-tests
+announcement. API/PostgreSQL checks confirmed exact recipients, no obligation
+from the announcement, authorization denials, idempotent read/event handling,
+and a forced outbox insert failure that returned 503 and rolled back both kinds
+of publication. The old directory browser suite initially failed because its
+page-wide Section A selector also matched the new announcement form; its
+existing checks were scoped to the original Activity form and passed.
+The first Milestone 4 browser run had a status locator matching both a filter
+and status explanation; the locator was narrowed to the rendered status badge.
+The first full `npm run check` stopped at Prettier because a Windows Git
+checkout had converted otherwise unchanged files to CRLF. Prettier now accepts
+either checkout line ending, and formatting-only changes to prior files were
+restored. No prior test assertion was removed. Expected synthetic outbox
+failure logs `P0001` while both publications roll back.
+An intermediate combined run passed identity, Activity and directory checks,
+then Edge closed unexpectedly during the new announcement browser step. The
+focused Milestone 4 suite had passed that step. Windows showed about 1.10 GiB
+free afterward, but the exact browser-closure cause was not established.
+The browser test now closes finished contexts before opening the next one;
+the final combined run passed without any Docker, WSL or memory-limit changes.
+
+Limitations: no approved 124-student roster or production users are present.
+Desktop push, offline workers, notification retries, recurrence, Activity
+cancellation/editing, reviewer UI, dynamic groups and actual follow-up delivery
+remain outside this milestone. Roster candidate and result pages are bounded
+at 50; filters apply to the current page while summaries and copy use the full
+authorized set. Published recipients are a snapshot; later roster/mapping
+changes do not silently rewrite assignments or notifications. Local synthetic
+verification does not establish production readiness.

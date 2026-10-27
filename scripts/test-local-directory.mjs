@@ -1156,15 +1156,20 @@ async function main() {
               .getByRole('button', { name: 'Sign in to local Supabase' })
               .click();
             await page.goto(`${config.appOrigin}/dashboard/faculty`);
+            const createForm = page.locator(
+              'section[aria-labelledby="create-heading"]',
+            );
             await expect(
-              page.getByRole('checkbox', { name: /Section A/ }),
+              createForm.getByRole('checkbox', { name: /Section A/ }),
             ).toBeVisible();
-            await page.getByRole('checkbox', { name: /Section A/ }).check();
-            await expect(page.locator('.dashboard-alert')).toContainText(
+            await createForm
+              .getByRole('checkbox', { name: /Section A/ })
+              .check();
+            await expect(createForm.locator('.dashboard-alert')).toContainText(
               'No eligible students',
             );
             await expect(
-              page.getByRole('button', {
+              createForm.getByRole('button', {
                 name: 'Publish to selected sections',
               }),
             ).toBeDisabled();
@@ -1308,22 +1313,21 @@ async function main() {
           });
           const facultyPage = await browserLogin(facultyContext, placement);
           await facultyPage.goto(`${config.appOrigin}/dashboard/faculty`);
+          const createForm = facultyPage.locator(
+            'section[aria-labelledby="create-heading"]',
+          );
           await expect(
             facultyPage.getByRole('heading', { name: 'Create one activity' }),
           ).toBeVisible();
-          await expect(facultyPage.getByText('2 eligible now')).toHaveCount(2);
-          await facultyPage
-            .getByRole('checkbox', { name: /Section A/ })
-            .focus();
+          await expect(createForm.getByText('2 eligible now')).toHaveCount(2);
+          await createForm.getByRole('checkbox', { name: /Section A/ }).focus();
           await facultyPage.keyboard.press('Space');
           await expect(
-            facultyPage.getByRole('checkbox', { name: /Section A/ }),
+            createForm.getByRole('checkbox', { name: /Section A/ }),
           ).toBeChecked();
-          await facultyPage
-            .getByRole('checkbox', { name: /Section B/ })
-            .check();
-          await facultyPage.getByRole('textbox', { name: 'Title' }).fill(title);
-          await facultyPage
+          await createForm.getByRole('checkbox', { name: /Section B/ }).check();
+          await createForm.getByRole('textbox', { name: 'Title' }).fill(title);
+          await createForm
             .getByRole('textbox', { name: 'Description' })
             .fill('Real browser test instructions');
           const dates = await facultyPage.evaluate(() => {
@@ -1339,12 +1343,12 @@ async function main() {
               end: local(7200000),
             };
           });
-          await facultyPage.locator('input[name="startsAt"]').fill(dates.start);
-          await facultyPage
+          await createForm.locator('input[name="startsAt"]').fill(dates.start);
+          await createForm
             .locator('input[name="deadlineAt"]')
             .fill(dates.deadline);
-          await facultyPage.locator('input[name="endsAt"]').fill(dates.end);
-          await facultyPage
+          await createForm.locator('input[name="endsAt"]').fill(dates.end);
+          await createForm
             .getByRole('checkbox', {
               name: /Require authorized staff verification/,
             })
@@ -1361,14 +1365,14 @@ async function main() {
             [capability.rows[0].responsibility_id],
           );
           try {
-            await facultyPage
+            await createForm
               .getByRole('button', { name: 'Publish to selected sections' })
               .click();
-            await expect(facultyPage.locator('.dashboard-alert')).toContainText(
+            await expect(createForm.locator('.dashboard-alert')).toContainText(
               'not permitted',
             );
             await expect(
-              facultyPage.getByRole('textbox', { name: 'Title' }),
+              createForm.getByRole('textbox', { name: 'Title' }),
             ).toHaveValue(title);
             assert.equal(
               (
@@ -1387,21 +1391,21 @@ async function main() {
               [capability.rows[0].responsibility_id],
             );
           }
-          await facultyPage
+          await createForm
             .getByRole('button', { name: 'Refresh options' })
             .click();
           await expect(
-            facultyPage.getByRole('button', {
+            createForm.getByRole('button', {
               name: 'Publish to selected sections',
             }),
           ).toBeEnabled();
-          await facultyPage
+          await createForm
             .locator('form.dashboard-form button[type="submit"]')
             .evaluate((button) => {
               button.click();
               button.click();
             });
-          await expect(facultyPage.locator('.dashboard-notice')).toContainText(
+          await expect(createForm.locator('.dashboard-notice')).toContainText(
             'Saved one activity with 4 assigned students',
           );
           const createdRows = await db.query(

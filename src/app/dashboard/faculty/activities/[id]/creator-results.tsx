@@ -7,6 +7,8 @@ import type {
   CreatorMonitor,
 } from '../../../dashboard-data';
 import { dashboardJson, formatWhen } from '../../../dashboard-data';
+import { CompletionProgress } from '../../../completion-progress';
+import { PendingCopyButton } from '../../../pending-copy-button';
 
 type ResultFilter =
   'all' | 'pending' | 'overdue' | 'reported' | 'awaiting' | 'verified';
@@ -139,6 +141,13 @@ export function CreatorResults({ activityId }: { activityId: string }) {
               <span>Verified</span>
             </div>
           </div>
+          <CompletionProgress
+            total={monitor.totalAssigned}
+            reported={monitor.selfReportedCompleted}
+            awaiting={monitor.awaitingVerification}
+            verified={monitor.verified}
+          />
+          <PendingCopyButton activityId={activityId} view="creator" />
           <div className="dashboard-toolbar">
             <p className="dashboard-muted">
               Filtering the {monitor.assignments.length} assignments on this

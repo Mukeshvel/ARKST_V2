@@ -34,6 +34,7 @@ export function DashboardNav({
             )}
           </>
         )}
+        <Link href="/dashboard/notifications">Inbox</Link>
         <Link href="/profile">Profile</Link>
         <form action="/auth/logout" method="post">
           <button className="dashboard-text-button" type="submit">

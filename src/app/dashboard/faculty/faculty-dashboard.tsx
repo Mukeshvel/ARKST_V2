@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { Activity, CreationOption } from '../dashboard-data';
 import { dashboardJson, formatWhen } from '../dashboard-data';
+import { CandidatePicker, type Candidate } from './candidate-picker';
 
 type Created = {
   id: string;
@@ -27,6 +28,10 @@ export function FacultyDashboard() {
   const [departmentId, setDepartmentId] = useState('');
   const [category, setCategory] = useState('');
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [targetMode, setTargetMode] = useState<
+    'sections' | 'selected' | 'counseling'
+  >('sections');
+  const [selectedStudents, setSelectedStudents] = useState<Candidate[]>([]);
   const selection = useRef({ departmentId: '', category: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -157,6 +162,7 @@ export function FacultyDashboard() {
     setDepartmentId(id);
     setCategory(nextCategory);
     setSelectedSections([]);
+    setSelectedStudents([]);
     setCreated(null);
   }
 
@@ -164,6 +170,7 @@ export function FacultyDashboard() {
     selection.current = { departmentId, category: key };
     setCategory(key);
     setSelectedSections([]);
+    setSelectedStudents([]);
     setCreated(null);
   }
 
@@ -185,9 +192,15 @@ export function FacultyDashboard() {
     setCreated(null);
     const form = new FormData(event.currentTarget);
     try {
-      if (!departmentId || !category || selectedSections.length === 0)
+      if (
+        !departmentId ||
+        !category ||
+        (targetMode === 'sections'
+          ? selectedSections.length === 0
+          : selectedStudents.length === 0)
+      )
         throw new Error(
-          'Select an authorized category and at least one section.',
+          'Select an authorized category and at least one recipient.',
         );
       const startsAt = new Date(
         String(form.get('startsAt') ?? ''),
@@ -200,21 +213,32 @@ export function FacultyDashboard() {
         throw new Error(
           'Start must precede the deadline, and the end must follow it.',
         );
-      const body = await dashboardJson<Created>('/api/activities/sections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          departmentScopeId: departmentId,
-          sectionIds: selectedSections,
-          category,
-          title: String(form.get('title') ?? ''),
-          description: String(form.get('description') ?? ''),
-          startsAt,
-          deadlineAt,
-          endsAt,
-          requiresVerification: form.get('requiresVerification') === 'on',
-        }),
-      });
+      const sectionMode = targetMode === 'sections';
+      const body = await dashboardJson<Created>(
+        sectionMode ? '/api/activities/sections' : '/api/activities/selected',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            departmentScopeId: departmentId,
+            ...(sectionMode
+              ? { sectionIds: selectedSections }
+              : {
+                  studentIds: selectedStudents.map(
+                    (student) => student.studentId,
+                  ),
+                  counselingOnly: targetMode === 'counseling',
+                }),
+            category,
+            title: String(form.get('title') ?? ''),
+            description: String(form.get('description') ?? ''),
+            startsAt,
+            deadlineAt,
+            endsAt,
+            requiresVerification: form.get('requiresVerification') === 'on',
+          }),
+        },
+      );
       if (!body.id || typeof body.assignedCount !== 'number')
         throw new Error(
           'The save response is incomplete. Reload before retrying.',
@@ -301,33 +325,67 @@ export function FacultyDashboard() {
                 ))}
               </select>
             </label>
-            <fieldset>
-              <legend>Assign to sections</legend>
-              {sections.map((section) => (
-                <label className="dashboard-checkbox" key={section.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedSections.includes(section.id)}
-                    onChange={() => toggleSection(section.id)}
-                  />
-                  <span>
-                    {section.name}{' '}
-                    <small>· {section.eligible} eligible now</small>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-            <p className="dashboard-muted">
-              {eligibleNow} eligible student{eligibleNow === 1 ? '' : 's'} in
-              selected sections now. The saved count may change if the roster
-              changes before publication.
-            </p>
-            {eligibleNow === 0 && selectedSections.length > 0 && (
-              <p className="dashboard-alert" role="status">
-                No eligible students are currently provisioned in the selected
-                sections. Publication requires at least one.
+            <label>
+              Assign to
+              <select
+                value={targetMode}
+                onChange={(event) => {
+                  setTargetMode(event.target.value as typeof targetMode);
+                  setSelectedSections([]);
+                  setSelectedStudents([]);
+                  setCreated(null);
+                }}
+              >
+                <option value="sections">
+                  All eligible students in section(s)
+                </option>
+                <option value="selected">Selected eligible students</option>
+                <option value="counseling">
+                  My current counseling students
+                </option>
+              </select>
+            </label>
+            {targetMode === 'sections' ? (
+              <fieldset>
+                <legend>Assign to sections</legend>
+                {sections.map((section) => (
+                  <label className="dashboard-checkbox" key={section.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSections.includes(section.id)}
+                      onChange={() => toggleSection(section.id)}
+                    />
+                    <span>
+                      {section.name}{' '}
+                      <small>· {section.eligible} eligible now</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : (
+              <CandidatePicker
+                departmentId={departmentId}
+                category={category}
+                counselingOnly={targetMode === 'counseling'}
+                selected={selectedStudents}
+                onChange={setSelectedStudents}
+              />
+            )}
+            {targetMode === 'sections' && (
+              <p className="dashboard-muted">
+                {eligibleNow} eligible student{eligibleNow === 1 ? '' : 's'} in
+                selected sections now. The saved count may change if the roster
+                changes before publication.
               </p>
             )}
+            {targetMode === 'sections' &&
+              eligibleNow === 0 &&
+              selectedSections.length > 0 && (
+                <p className="dashboard-alert" role="status">
+                  No eligible students are currently provisioned in the selected
+                  sections. Publication requires at least one.
+                </p>
+              )}
             <label>
               Title <input name="title" required maxLength={160} />
             </label>
@@ -365,12 +423,17 @@ export function FacultyDashboard() {
                 saving ||
                 optionsLoading ||
                 Boolean(optionsError) ||
-                eligibleNow === 0 ||
-                selectedSections.length === 0
+                (targetMode === 'sections'
+                  ? eligibleNow === 0 || selectedSections.length === 0
+                  : selectedStudents.length === 0)
               }
               type="submit"
             >
-              {saving ? 'Saving activity…' : 'Publish to selected sections'}
+              {saving
+                ? 'Saving activity…'
+                : targetMode === 'sections'
+                  ? 'Publish to selected sections'
+                  : 'Publish activity'}
             </button>
             {saveError && (
               <p role="alert" className="dashboard-alert">
@@ -383,13 +446,15 @@ export function FacultyDashboard() {
                   Saved one activity with {created.assignedCount} assigned
                   student{created.assignedCount === 1 ? '' : 's'}.
                 </p>
-                <p>
-                  {created.unlinkedRows} unlinked, {created.inactiveRows}{' '}
-                  inactive and {created.missingMembershipRows}{' '}
-                  missing-membership roster row
-                  {created.missingMembershipRows === 1 ? '' : 's'} were
-                  excluded.
-                </p>
+                {targetMode === 'sections' && (
+                  <p>
+                    {created.unlinkedRows} unlinked, {created.inactiveRows}{' '}
+                    inactive and {created.missingMembershipRows}{' '}
+                    missing-membership roster row
+                    {created.missingMembershipRows === 1 ? '' : 's'} were
+                    excluded.
+                  </p>
+                )}
                 <Link href={`/dashboard/faculty/activities/${created.id}`}>
                   Open completion results
                 </Link>
