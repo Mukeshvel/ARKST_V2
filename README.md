@@ -1,10 +1,10 @@
 # ARKST — secure Activity engine
 
-Milestones 1 and 2.1 are preserved. Milestone 3A adds a real PostgreSQL Activity API
-with direct assignments, completion, optional staff verification and actor history.
-Identity and Activity integration suites have passed against isolated local Supabase.
-There is no academic dashboard. See [PROJECT_STATUS](docs/PROJECT_STATUS.md) for evidence
-and [ACTIVITY_ENGINE](docs/ACTIVITY_ENGINE.md) for the API and permission boundaries.
+Milestones 1, 2.1 and 3A are preserved. Milestone 3B-1 adds a structured department
+roster, approved counselor-student mappings and self-service staff profiles on the real
+PostgreSQL Activity and identity foundation. See [PROJECT_STATUS](docs/PROJECT_STATUS.md),
+[ACTIVITY_ENGINE](docs/ACTIVITY_ENGINE.md) and [DEPARTMENT_DIRECTORY](docs/DEPARTMENT_DIRECTORY.md)
+for evidence, workflows and permission boundaries. No real departmental roster was imported.
 
 Use Node.js 24 LTS and npm:
 

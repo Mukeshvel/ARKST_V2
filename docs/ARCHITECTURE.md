@@ -8,19 +8,20 @@ Initial scale: approximately 130 students and 50 staff; no microservices or mono
 Milestone 1's public foundation page and pure completion/window rules are preserved.
 Milestone 2 adds real Supabase Auth integration code, a protected own-profile page,
 an own-profile API, session handling, SQL migrations and executable identity/RLS tests.
-Milestone 2.1 verified these flows against local Supabase. Milestone 3A adds the shared
-Activity API and transactional PostgreSQL operations. See PROJECT_STATUS for executed
-regression checks and [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) for the complete API contract.
+Milestone 2.1 verified these flows against local Supabase. Milestones 3A and 3B-1 add
+the shared Activity API, structured department roster, trusted counselor mappings and
+staff self-service. See PROJECT_STATUS for executed regression checks,
+[ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) and [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md).
 
-- `src/app`: public status page, local login form, protected profile rendering and
-  `/auth/login`, `/auth/logout`, `/api/me` route handlers.
+- `src/app`: public status page, local login form, protected profile rendering,
+  `/api/me`, Activity and staff-directory route handlers.
 - `src/auth`: server-only cookie clients, verified identity lookup and safe error handling;
   pure request validation utilities support bounded forms and same-origin mutations.
-- `src/data`: own-profile, responsibility and Activity queries using the caller's session.
+- `src/data`: own-profile, responsibility, Activity and staff-directory queries using the caller's session.
 - `src/config`: application-origin and identity configuration validation.
 - `src/proxy.ts`: Next.js 16 session refresh and private response cache headers.
 - `src/core`: framework-free completion accounting and configurable window rules.
-- `supabase`: applied local identity/Activity migrations, local config and pgTAP security tests.
+- `supabase`: applied local identity, Activity and directory migrations, local config and pgTAP security tests.
 - `tests/integration` and `scripts/test-local-identity.mjs`: genuine local Auth/HTTP/REST
   tests that require an explicitly isolated local stack; no substitute login is provided.
 

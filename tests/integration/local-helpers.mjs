@@ -9,7 +9,7 @@ function required(env, name) {
   return value;
 }
 
-function localUrl(value, protocols, name, allowCredentials = false) {
+export function localUrl(value, protocols, name, allowCredentials = false) {
   let url;
   try {
     url = new URL(value);

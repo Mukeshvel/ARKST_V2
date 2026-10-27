@@ -87,7 +87,9 @@ Registry metadata and installed package types are used to check package compatib
    Assess hosting free-tier capacity, abuse controls, availability, backups and recovery
    before any deployment. No production-readiness claim is made.
 
-Milestone 3A implements direct activities only. Milestone 3B must not start automatically.
+Milestone 3A implemented direct activities only. Milestone 3B-1 is the directory and
+staff self-service slice; its scope ends before dashboards, notifications or group
+targeting.
 
 ## Milestone 3A decisions
 

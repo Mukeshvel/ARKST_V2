@@ -19,7 +19,7 @@ async function main() {
     'Require explicit LOCAL_IDENTITY_TESTS=1',
   );
   const suite = process.argv[2] ?? 'all';
-  assert.ok(['all', 'identity', 'activity'].includes(suite));
+  assert.ok(['all', 'identity', 'activity', 'directory'].includes(suite));
   const { stdout } = await execute(
     process.execPath,
     ['node_modules/supabase/dist/supabase.js', 'status', '--output', 'json'],
@@ -114,8 +114,12 @@ async function main() {
       assert.equal(code, 0, `${script} failed`);
     }
     await run('scripts/smoke.mjs');
-    if (suite !== 'activity') await run('scripts/test-local-identity.mjs');
-    if (suite !== 'identity') await run('scripts/test-local-activities.mjs');
+    if (suite === 'all' || suite === 'identity')
+      await run('scripts/test-local-identity.mjs');
+    if (suite === 'all' || suite === 'activity')
+      await run('scripts/test-local-activities.mjs');
+    if (suite === 'all' || suite === 'directory')
+      await run('scripts/test-local-directory.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');
@@ -126,10 +130,17 @@ async function main() {
 }
 
 main().catch((error) => {
-  // Child-process errors can contain CLI stdout with keys. Never print the error object.
-  console.error(
-    'Local verification failed:',
-    error.code ?? error.message?.split('\n')[0],
-  );
+  // Do not print raw child stdout: `supabase status` includes local credentials.
+  const message = String(
+    error.stack ?? error.message ?? error.code ?? 'Unknown failure',
+  )
+    .replace(
+      /(?:SERVICE_ROLE_KEY|SECRET_KEY|ANON_KEY|PUBLISHABLE_KEY|JWT_SECRET)[^\n]*/gi,
+      '[redacted local credential output]',
+    )
+    .split('\n')
+    .slice(0, 5)
+    .join('\n');
+  console.error('Local verification failed:', message);
   process.exitCode = 1;
 });

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireOwnIdentity } from '@/auth/identity';
 import { publicIdentityError } from '@/auth/errors';
+import { StaffDirectoryEditor } from './staff-directory-editor';
 
 export const dynamic = 'force-dynamic';
 export default async function ProfilePage() {
@@ -56,9 +57,10 @@ export default async function ProfilePage() {
       ) : (
         <p>No current staff responsibilities assigned.</p>
       )}
+      {profile.account_kind === 'staff' && <StaffDirectoryEditor />}
       <p>
-        This page grants no access to other people’s records. Academic workflows
-        are not implemented.
+        Self-service details describe your current work preferences. They do not
+        grant activity, counselor, HOD or admin permissions.
       </p>
       <form action="/auth/logout" method="post">
         <button type="submit">Sign out</button>

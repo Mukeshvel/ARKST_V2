@@ -144,7 +144,7 @@ async function main() {
     assert.equal(
       response.status,
       expected,
-      `${path}: ${await response.clone().text()}`,
+      `${path} for ${user.email ?? 'anonymous'}: ${await response.clone().text()}`,
     );
     assert.match(response.headers.get('cache-control') ?? '', /no-store/);
     return response.json();
@@ -195,9 +195,8 @@ async function main() {
     noDatabaseError(
       await admin.from('scopes').insert({
         id: scopes[1],
-        kind: 'section',
-        parent_id: scopes[0],
-        name: `Activity section ${runId}`,
+        kind: 'department',
+        name: `Other activity department ${runId}`,
       }),
       'create section',
     );
@@ -293,12 +292,16 @@ async function main() {
             [staff.id],
           )
         ).rows[0].n;
-        for (const data of [
-          input([a, c]),
-          input([c], { scopeId: scopes[1] }),
-          input([a], { category: 'placement' }),
+        for (const [scenario, data] of [
+          ['cross-section target in a department publication', input([a, c])],
+          ['unrelated department scope', input([c], { scopeId: scopes[1] })],
+          ['uncapable category', input([a], { category: 'placement' })],
         ]) {
-          await post(staff, '/api/activities', data, 403);
+          try {
+            await post(staff, '/api/activities', data, 403);
+          } catch (error) {
+            throw new Error(`${scenario}: ${error.message}`);
+          }
           deniedWrite(await staff.client.rpc('create_activity', rpc(data)));
         }
         assert.equal(

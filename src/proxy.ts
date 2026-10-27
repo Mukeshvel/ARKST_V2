@@ -60,5 +60,7 @@ export const config = {
     '/api/me/:path*',
     '/api/activities/:path*',
     '/api/activity-assignments/:path*',
+    '/api/staff-directory/:path*',
+    '/api/counselor/:path*',
   ],
 };

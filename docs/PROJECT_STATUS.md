@@ -1,154 +1,95 @@
-# Project status — Milestone 3A, 2026-10-27
+# Project status — Milestone 3B-1, 2026-10-27
 
-The shared PostgreSQL Activity API is implemented and locally verified. Final checks
-passed 89 SQL assertions, 12 identity integration groups and 16 Activity integration
-groups, including the 130-student SQL case and updated status-page smoke checks.
-Milestone 3B has not started. This is local verification, not production readiness.
+Milestone 3B-1 adds a structured department roster, trusted counselor-student mappings and faculty self-service to the preserved identity and Activity foundation. Synthetic-data verification passed locally against Supabase. No actual departmental roster or production accounts were imported or created. This is not production readiness. Milestone 3B-2 and later work have not started.
 
 ## Baseline and preservation
 
-Started clean at dc7ba86 (`2.1 - docker works`) on main, matching origin/main. Read the
-architecture, domain, permissions, decisions, project status, identity implementation,
-config, migration and tests. No repository AGENTS.md was found. No dependencies changed.
-
-The identity migration/policies, Auth configuration, identity implementation and its
-36 SQL assertions/12 integration groups are unchanged. Proxy adds Activity routes to
-session refresh/private headers. The foundation page has updated status text only.
-Prior status is preserved in MILESTONE_2_1_STATUS.md as historical evidence.
+Started at clean `2ac69a6` (`3A: SECURE ACTIVITY ENGINE`) on `main`. The M3A status and evidence are preserved in [MILESTONE_3A_STATUS.md](MILESTONE_3A_STATUS.md). Existing identity, Activity and their migrations were preserved. No remote Supabase, deploy, push or commit was used.
 
 ## Implementation
 
-Migration 20261027000100_activity_engine.sql adds seven tables: categories, exact
-student scope memberships, explicit staff capabilities, activities, assignments,
-one completion per assignment and authenticated actor/timestamp history.
+Migrations `20261027000200_department_directory.sql` and `20261027000300_directory_validation.sql` add a text-keyed student roster, effective-dated counselor mappings, self-editable staff directory profile, section preferences and actor/time audit records. Existing identity responsibilities, sections, student scope memberships and Activity capability model are reused. The Activity authorization rule permits an explicitly provisioned department-scoped create capability to target its direct sections; it does not grant unrelated student data access. Direct-student targeting remains the only Activity targeting mode.
 
-The API creates activities and direct assignments atomically, lists visible activities
-and history with pagination, accepts student completion reports and supports optional
-staff verification. All app operations use the caller's session/public key. Initial
-categories are assignment, weekly_test, nptel, seminar, mini_project, placement, general;
-operators can extend categories without separate tables or workflow branches.
+The authenticated `/profile` editor saves teaching status, sections, subjects and descriptive designation through a cookie-authenticated route and a transaction using `auth.uid()`. Database policy validates the staff's existing responsibility and section scope, syncs the existing classification field, and records before/after state. Profile selections never change role or capability grants. Counselor access derives only from approved effective-dated counselor mappings and active counselor responsibility.
 
-No role automatically grants authority. A trusted operator must approve capability rows
-for a specific current responsibility/category and department/section scope. Every target
-must have an active student profile and current exact-scope membership. No hierarchy,
-metadata-based authority, group simulation or standing staff grants were introduced.
+`scripts/directory-admin.mjs` is an explicit local-only operator tool with preview by default and transactional `--apply`: import an approved roster, import counselor mappings, or provision a role and explicit Activity capability for an already-existing confirmed Auth user. It creates no Auth users and refuses non-loopback database hosts. The admin role and database owner remain trusted operator boundaries. See [DEPARTMENT_DIRECTORY.md](DEPARTMENT_DIRECTORY.md).
 
-Date windows are configurable: start < deadline <= end; submission is start-inclusive
-and deadline-exclusive using database time. Required verification stays reported until
-an approved reviewer verifies. Unique completion keys and assignment row locks prevent
-duplicates; repeated/invalid transitions return 409. Writes and history commit together.
-Direct client table writes are revoked; read RLS filters each table independently.
+## Verification commands and results
 
-See [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) for API payloads, provisioning, states, errors,
-security boundaries, test execution and limitations.
+Commands were executed from the repository root using the running isolated local Supabase stack. All test records were synthetic and cleanup ran after integration suites.
 
-## Commands and actual results
+| Command                                                                                | Result                                                                                                                            |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                                                                        | PASS after implementation: formatting, typecheck, lint, 88 Vitest tests, 10 helper safety tests and production build.             |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`       | PASS: 3 pgTAP files, 121 assertions, including Milestone 2 identity, Milestone 3A Activity and directory RLS/security regression. |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- directory` | PASS: smoke and 11 real directory integration groups against local Auth, HTTP, Postgres and RLS.                                  |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- identity`  | PASS: smoke and 12 real identity integration groups.                                                                              |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- activity`  | PASS: smoke and 16 real Activity integration groups, including unrelated department denial.                                       |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`              | PASS: smoke, 12 identity, 16 Activity and 11 directory groups in one run; generated records were cleaned.                         |
+| `git diff --check`                                                                     | PASS after documentation updates.                                                                                                 |
 
-Commands ran from C:\RMK\Git Projects\ARKST V2. The sandbox-only docker ps initially
-failed with named-pipe permission denied; authorized Docker access succeeded.
+Directory coverage: nonconsecutive text identifiers; 4-row roster transaction; duplicate/invalid/unauthorized imports; counselor caseloads of 3 and 1; counselor-only mapped visibility; existing-confirmed-user staff provisioning; self-edit to non-teaching / both sections / custom designation / subjects; mapping stability; nonteaching placement; no self-granted roles; student/faculty cross-profile denial; validation and database failures. No records are fake-authenticated; test users sign in through local Supabase Auth.
 
-| Command                                                                                        | Result                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| git status --short --branch; git log -1 --oneline                                              | Clean baseline dc7ba86 on main; no commits/pushes in 3A.                                                                                  |
-| docker ps --format 'table {{.Names}}\t{{.Status}}'                                             | Existing Postgres, Auth and Kong healthy; PostgREST running.                                                                              |
-| docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}'                             | Initial sample: REST 54.13, Auth 14.91, Kong 101.4, DB 76.29 MiB; about 247 MiB total, Docker limit 3.665 GiB.                            |
-| $env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --help | Confirmed installed CLI's --local target.                                                                                                 |
-| npx supabase migration up --local                                                              | New Activity migration applied; identity migration/volume preserved, no reset.                                                            |
-| npm run format; npm run check                                                                  | First check stopped on Activity test-script formatting; no tests counted as passed.                                                       |
-| npx prettier --write scripts/test-local-activities.mjs; npm run check                          | Passed formatting, TypeScript, zero-warning lint, 76 Vitest tests (59 existing + 17 new), 10 existing guard tests and production build.   |
-| $env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls                 | Initial 85 assertions passed: 36 identity + 49 Activity, 2 files. Four bulk-target assertions added for final run.                        |
-| $env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local                        | Passed real production HTTP smoke (anonymous /api/me=401), 12 identity groups, 16 Activity groups. Test app stopped and fixtures cleaned. |
+### Failed checks and corrections
 
-### Final verification after all implementation changes
-
-| Command                                                                        | Final result                                                                                                                                      |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| npm run format; npm run check                                                  | Passed format, typecheck, lint, all 76 Vitest tests, all 10 guard tests and production build.                                                     |
-| $env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls | **PASS: 2 files, 89 assertions: 36 identity + 53 Activity.** Includes the 130-target transaction and isolation checks.                            |
-| $env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local        | **PASS: updated production smoke + 12 real identity groups + 16 real Activity groups**, with no failed/skipped assertions. Temporary app stopped. |
-| npm audit --audit-level=low                                                    | Exit 0, zero reported vulnerabilities; no dependency changes.                                                                                     |
-| npm ls --all --json                                                            | Exit 0, valid dependency tree.                                                                                                                    |
-| docker ps; docker stats --no-stream; docker inspect                            | Postgres/Auth/Kong healthy, REST running; all four OOMKilled=false. Final total about 282 MiB of 3.665 GiB.                                       |
-| Local psql fixture-count query via docker exec                                 | Zero generated Auth users, activities, assignments, completions, history, capabilities, memberships and test failure schemas.                     |
-
-Final per-container memory sample: REST 65.38 MiB, Auth 17.64 MiB, Kong 108.7 MiB,
-DB 90.17 MiB. No memory shortage, runtime replacement or WSL limit changes occurred.
-Local Supabase remains running; the ephemeral test app was stopped. This read-only
-cleanup query was executed through docker exec against the local container:
-
-```sql
-select 'generated_auth_users' as object, count(*) from auth.users where email like 'arkst-%@example.test'
-union all select 'activities', count(*) from public.activities
-union all select 'assignments', count(*) from public.activity_assignments
-union all select 'completions', count(*) from public.activity_completions
-union all select 'history', count(*) from public.activity_history
-union all select 'capabilities', count(*) from public.activity_capabilities
-union all select 'memberships', count(*) from public.student_scope_memberships
-union all select 'failure_schemas', count(*) from pg_namespace
-where nspname like 'activity_test_%' or nspname like 'identity_test_%';
-```
-
-The malformed-cookie identity test intentionally emits SSR decode warnings and checks 401. Injected real database failures log SQLSTATE 58000 and return 503; independent
-queries confirm rollback, followed by successful recovery. pgTAP emits the existing
-optional pg_net/pg_cron grant warnings. No Auth/Activity integration assertion failed.
-
-## Verification coverage
-
-Authorized and unauthorized creation; atomic target validation; scope/category/hierarchy
-and combined-role isolation; student-only assignments/completions/history; forged actor
-and state rejection; direct REST/RPC enforcement; concurrent duplicate submission;
-persistence after fresh login/read; required review and invalid transitions; date,
-request-size, duplicate-target and CSRF validation; inactive/expired authorization;
-real read/audit-write database failures, rollback and recovery; category extension and
-pagination. All existing identity security scenarios passed unchanged.
-
-The SQL suite separately checks grants, RLS, fixed definer search paths, constraints,
-state transitions and exact time boundaries. Its added 130-student publication case
-checks assignment/history counts and one student's isolation. This is not a concurrent
-130-student/50-staff load test. SQL role contexts are not claimed as Auth verification.
-
-Only generated example.test users and isolated records were used. SQL fixtures roll
-back; integration cleanup removes generated accounts, scopes, records and failure hooks.
-Local keys stay in process memory; the app receives no service-role key or owner URL.
-No remote Supabase, external database, real college records or deployment was used.
-
-## Changed files
-
-- Database: supabase/migrations/20261027000100_activity_engine.sql;
-  supabase/tests/database/activity_security.test.sql.
-- API: src/app/api/activities/route.ts; src/app/api/activities/[id]/route.ts;
-  src/app/api/activities/[id]/history/route.ts;
-  src/app/api/activity-assignments/[id]/submit/route.ts;
-  src/app/api/activity-assignments/[id]/verify/route.ts.
-- Boundaries: src/auth/activity-http.ts; src/data/activities.ts;
-  src/core/activity-input.ts; src/core/activity-input.test.ts; src/proxy.ts.
-- Verification: scripts/test-local-activities.mjs; scripts/run-local-verification.mjs;
-  scripts/smoke.mjs; package.json (scripts only).
-- Documentation/status: README.md; docs/ACTIVITY_ENGINE.md; docs/ARCHITECTURE.md;
-  docs/DOMAIN_MODEL.md; docs/PERMISSIONS.md; docs/DECISIONS.md; docs/LOCAL_SUPABASE.md;
-  docs/PROJECT_STATUS.md; docs/MILESTONE_2_1_STATUS.md; src/data/README.md;
-  src/app/page.tsx (status copy only).
+- One `npm run check` stopped at `prettier --check` after the status/docs update; the three reported Markdown files were formatted, and the full check then passed.
+- An initial combined integration run under the default sandbox failed at the required Supabase CLI status/health lookup before tests started. Re-running with permitted Docker access completed the same health-gated runner; no checks were bypassed.
+- Earlier focused directory runs exposed an invalid SQL parameter in counselor import and a suite selector that rejected `directory`. The parameterization and selector were corrected; final directory-only and combined suites both passed.
+- One Activity regression fixture expected a same-department sibling section to be unauthorized even though the requested explicit department capability supports both direct sections. The fixture now tests denial across an unrelated department; the scoped denial check passed.
+- The identity suite emits Supabase SSR diagnostics while deliberately testing malformed cookie rejection; the malformed session is denied and all 12 identity assertions pass.
 
 ## Limits and next steps
 
-No group/dynamic targeting, recurrence, dashboards, notifications, counselor oversight
-workflow, follow-up, catch-up, edits/cancellation, evidence, return/resubmit or
-administrative/delegation tooling. Unsupported fields/targeting modes fail explicitly.
-Before real use, approve the college capability matrix, student membership source,
-deadline/late-work policy, review ownership and retention.
+- Actual 124-student official roster and administrator-approved counselor mapping file have not been supplied or imported.
+- CSV import is an operator CLI, not a browser admin workflow. The local database-owner URL plus approved admin responsibility is a privileged operational boundary and needs deployment-grade secret custody and operator procedures before production.
+- Google OAuth is not configured or tested. Authentication remains the existing provider configuration.
+- No production accounts were provisioned; only isolated synthetic local Auth users were used.
+- Dynamic groups, group targeting, complete dashboards, notifications, follow-up and catch-up are not implemented. Group targeting is rejected rather than simulated.
+- Administrative/HOD authority is still separately controlled; custom text and teaching status do not grant it. No institutional policies were invented.
+- The sandboxed first combined run exited before tests because the Supabase CLI could not inspect Docker. With authorized local Docker access, the same required health-gated runner completed. No health gate was bypassed and no remote target was used.
+- The installed CLI warns that `[inbucket]` is deprecated in favor of `[local_smtp]`; this did not fail local verification. pgTAP setup also emitted harmless optional `pg_net` and `pg_cron` privilege warnings.
+- Final Docker sample: REST 69.32 MiB, Auth 19.05 MiB, Kong 124.7 MiB, Postgres 101.8 MiB (about 315 MiB total of 3.665 GiB). No WSL memory limits were changed.
 
-Staff capability allows Activity reads throughout its exact scope/category, including
-other creators' activities there; no broad roster/profile access. Students retain existing
-assignments after membership expiry. New transactions re-evaluate authorization;
-concurrent operator revocation does not cancel an already authorized transaction.
-History is append-only for app users, but database owners/service-role can bypass RLS.
-Operator provisioning lacks a dedicated audit workflow. Create has no idempotency key;
-ambiguous network results require reload before retrying. Completion uniqueness remains.
+## Targeted 3B-1 security correction — 2026-10-27
 
-No full concurrent-load, hosted OAuth/infrastructure, browser/accessibility, refresh
-rotation or stolen-token replay verification. Copied JWTs may remain valid until expiry
-after logout; no immediate denylist. No production-readiness claim is made.
+The read-only preservation review found a weakened SECURITY DEFINER assertion, ordinary
+counselor access to inactive roster rows, no safe current-counselor replacement workflow,
+and child-section read/verify fanout from a department Activity capability. Forward-only
+migrations `20261027000400_directory_security_correction.sql` and
+`20261027000500_directory_active_staff_mapping.sql` were applied to the existing local
+database without reset. They retain historical counselor mappings and Activity rows.
 
-There are 12 modified tracked files and 15 new files, with nothing staged. Preserve
-dc7ba86 and review this diff as a separate 3A checkpoint. No commit, push, remote
-migration, WSL memory change, experimental infrastructure or Milestone 3B work occurred.
+The first migration rejects inconsistent existing directory relationships, enforces one
+non-overlapping primary counselor interval per student with a GiST exclusion constraint,
+guards roster department/section and mapped counselor role/scope relationships, hides
+inactive roster rows from ordinary counselor monitoring, and confines department-to-child
+Activity scope expansion to CREATE. Exact-scope 3A READ and VERIFY behavior remains.
+The second migration also denies direct mapping-table reads to inactive staff. The local
+operator CLI now previews or transactionally applies reassignment/revocation with roster
+row locks, stable lock order and actor audit entries. No real roster was imported.
+
+Focused directory integration passed 12 groups before the concurrent-write assertion was
+added. Its first run with that assertion failed at the conflict-code check; the output
+did not include the actual SQLSTATE, so that specific cause was unconfirmed. A diagnostic
+was added and the assertion now accepts either an exclusion conflict (`23P01`) or an
+exact-key duplicate (`23505`), while still requiring exactly one committed write and one
+active mapping. The next focused run and final combined run passed.
+
+| Correction verification command                                                                   | Actual result                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --local` | Applied `00400` and then `00500` to the existing local database, without reset.                                                                                     |
+| `npm run check`                                                                                   | PASS: formatting, typecheck, lint, 88 Vitest tests, 10 helper safety tests and production build.                                                                    |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`                  | PASS: 3 files, 146 pgTAP assertions, including identity, Activity, named SECURITY DEFINER functions, reviewed invoker, relationships and inactive counselor denial. |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                         | PASS: smoke, 12 identity, 16 Activity and 12 directory real Auth/HTTP/PostgreSQL/RLS groups; generated fixtures cleaned.                                            |
+
+Directory regression confirms old counselor access ends after reassignment; new counselor
+sees only mapped active students; inactive roster rows are absent from ordinary reads;
+prior mapping rows and Activity rows remain; revocation removes current access; competing
+inserts leave one active mapping. A department creator can publish separately to both
+Section A and Section B
+but cannot read/verify that child activity or browse private roster data from the create
+grant alone. Existing completion and verification regression groups continue passing.
+
+`git diff --check` passed and the tree remains unstaged on `main`. A read-only local
+PostgreSQL count found zero `arkst-dir-*` Auth users, matching directory audit rows and
+named placement test activities after the final suite.

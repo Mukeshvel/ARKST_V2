@@ -5,14 +5,14 @@
 Identity rules below were verified locally in Milestone 2.1 and regressed in 3A.
 Activity access is additive and explicitly provisioned, as described below.
 
-| Caller                                   | Current access                                                                                                                  |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Anonymous                                | No private table grants; protected API rejects missing identity.                                                                |
-| Active provisioned student               | Read own private profile only. No staff responsibilities or scope directory access.                                             |
-| Active provisioned staff                 | Read own profile, own current responsibilities and the exact scopes those responsibilities reference.                           |
-| Inactive or unprovisioned Auth user      | No private profile, responsibilities or scopes. Application reports a combined not-provisioned-or-inactive denial.              |
-| Staff with any role, including admin/HOD | Same own-data limits. No automatic student access, hierarchy inheritance or administrative bypass.                              |
-| Trusted operator                         | Explicit out-of-band provisioning using protected administrative/database credentials; no application role-management endpoint. |
+| Caller                                   | Current access                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Anonymous                                | No private table grants; protected API rejects missing identity.                                                                      |
+| Active provisioned student               | Read own private profile only. No staff responsibilities or scope directory access.                                                   |
+| Active provisioned staff                 | Read own profile, own current responsibilities and exact referenced scopes; counselor roster rows only via current approved mappings. |
+| Inactive or unprovisioned Auth user      | No private profile, responsibilities or scopes. Application reports a combined not-provisioned-or-inactive denial.                    |
+| Staff with any role, including admin/HOD | Same own-data limits. No automatic student access, hierarchy inheritance or administrative bypass.                                    |
+| Trusted operator                         | Explicit out-of-band provisioning using protected administrative/database credentials; no application role-management endpoint.       |
 
 Every application profile read derives the ID from server-verified `getClaims` and
 `getUser`, not a request parameter or client-selected identity. The API does not offer
@@ -91,6 +91,31 @@ expiry. Current staff capability controls staff reads; profile activation contro
 student reads. No hierarchy inheritance or group expansion is implemented.
 
 See [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) for examples, API errors and remaining limits.
+
+## Milestone 3B-1 directory boundaries
+
+An approved active department responsibility can read and update only that staff
+member's editable directory profile. Teaching status, section preferences, subjects
+and free-text designation do not grant roles, capabilities, counselor authority or
+access to other profiles. The editor accepts no role/capability fields. Student callers
+cannot update staff data, and staff cannot edit another staff member's directory record.
+
+Department-scoped Activity creation capabilities may target their direct child sections
+(including Section A, B or both) after trusted provisioning; this is independent of a
+staff member's teaching status or self-edited preferred sections. READ and VERIFY retain
+the committed 3A exact-scope rule and are not inherited by child sections from a
+department create grant. A create grant gives no general roster browsing. Approved
+current counselor-student mappings, an active roster row, active staff profile and a
+current counselor responsibility are required for ordinary counselor monitoring. Ended
+mappings remain in history but do not grant current RLS access. Mapping data is separate from self-service
+and cannot be modified through the faculty profile API. Counselor results omit email.
+
+Staff provisioning and CSV imports are out-of-band operator actions. Email confirmation
+alone is insufficient. The local operator CLI requires a current admin responsibility
+for the exact department and a loopback database URL, but uses a database-owner connection
+for transactions; the database owner remains trusted and can bypass RLS. Keep that
+credential protected. HOD/Admin policy is still controlled separately; no HOD privilege
+is inferred from a designation string. See [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md).
 
 ## Future role-to-capability policy — provisional and not implemented
 

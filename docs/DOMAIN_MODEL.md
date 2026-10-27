@@ -105,5 +105,15 @@ evidence requirements and changes to verification policy need approved semantics
 Monitoring should separate not reported, awaiting review and verified so students
 awaiting review are not misleadingly labeled as having submitted nothing.
 
+## Milestone 3B-1 department directory
+
+Migration `20261027000200_department_directory.sql` adds a text-keyed roster that does
+not assume consecutive student IDs, effective-dated counselor/student links, staff
+directory profiles, direct section preferences and actor/timestamp audit history.
+Roster rows can exist without Auth accounts; linking an account requires an existing
+trusted student profile. Counselor mapping references a counselor responsibility and
+roster identity, and remains independent of teaching-status and section-preference edits.
+See [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md) for CSV and API data flows.
+
 Announcements use the same scoped audience concepts. Follow-up history and future
 escalations reference assignments, rather than independent per-category databases.
