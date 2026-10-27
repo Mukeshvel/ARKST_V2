@@ -1,6 +1,10 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ActivityError, activityInput } from '@/core/activity-input';
+import {
+  ActivityError,
+  activityInput,
+  sectionActivityInput,
+} from '@/core/activity-input';
 
 function result<T>({
   data,
@@ -94,6 +98,46 @@ export async function createActivity(
       'Creation result is unavailable. Reload before retrying.',
     );
   return { id };
+}
+
+export async function createSectionActivity(
+  client: SupabaseClient,
+  input: ReturnType<typeof sectionActivityInput>,
+) {
+  const created = result(await client.rpc('create_section_activity', input));
+  if (
+    !created ||
+    typeof created !== 'object' ||
+    typeof (created as { id?: unknown }).id !== 'string' ||
+    typeof (created as { assignedCount?: unknown }).assignedCount !== 'number'
+  )
+    throw new ActivityError(
+      503,
+      'Creation result is unavailable. Reload before retrying.',
+    );
+  return created;
+}
+
+export async function monitorCreatedActivity(
+  client: SupabaseClient,
+  id: string,
+  offset: number,
+) {
+  return result(
+    await client.rpc('monitor_created_activity', {
+      p_activity: id,
+      p_offset: offset,
+    }),
+  );
+}
+
+export async function monitorCounselorActivities(
+  client: SupabaseClient,
+  offset: number,
+) {
+  return result(
+    await client.rpc('monitor_counselor_activities', { p_offset: offset }),
+  );
 }
 
 export async function changeCompletion(

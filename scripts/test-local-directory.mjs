@@ -43,6 +43,8 @@ async function main() {
     outside: randomUUID(),
     auditFailureFunction: `test_directory_audit_failure_${tag}`,
     auditFailureTrigger: `test_directory_audit_failure_${tag}`,
+    activityFailureFunction: `test_section_activity_failure_${tag}`,
+    activityFailureTrigger: `test_section_activity_failure_${tag}`,
   };
   const users = [];
   let connected = false,
@@ -621,6 +623,469 @@ async function main() {
       },
     );
 
+    let sectionActivity;
+    let sectionAssignment;
+    let unrosteredStudent;
+    const sectionInput = (sectionIds, title, requiresVerification = true) => ({
+      category: 'general',
+      departmentScopeId: ids.department,
+      sectionIds,
+      title,
+      description: 'Synthetic local section assignment',
+      startsAt: new Date(Date.now() - 60000).toISOString(),
+      deadlineAt: new Date(Date.now() + 3600000).toISOString(),
+      endsAt: new Date(Date.now() + 7200000).toISOString(),
+      requiresVerification,
+    });
+    await check(
+      'approved creator snapshots Section A and Both from active roster without duplicate assignments',
+      async () => {
+        unrosteredStudent = await user('unrostered-student', 'student');
+        const inactiveRoster = await user('inactive-roster', 'student');
+        const missingMembership = await user('missing-membership', 'student');
+        noDatabaseError(
+          await admin.from('student_scope_memberships').insert({
+            student_id: unrosteredStudent.id,
+            scope_id: ids.sectionA,
+          }),
+          'provision membership without roster row',
+        );
+        noDatabaseError(
+          await admin.from('student_scope_memberships').insert({
+            student_id: inactiveRoster.id,
+            scope_id: ids.sectionB,
+          }),
+          'provision inactive roster student membership',
+        );
+        await db.query(
+          `insert into public.department_student_roster
+            (department_scope_id,external_student_id,display_name,section_scope_id,linked_student_id,active,created_by)
+            values($1,'UNLINKED-LOCAL','Unlinked local student',$2,null,true,$5),
+              ($1,'INACTIVE-LOCAL','Inactive local student',$3,$6,false,$5),
+              ($1,'NO-MEMBERSHIP','Missing membership',$2,$4,true,$5)`,
+          [
+            ids.department,
+            ids.sectionA,
+            ids.sectionB,
+            missingMembership.id,
+            operator.id,
+            inactiveRoster.id,
+          ],
+        );
+        const sectionA = await api(
+          placement,
+          '/api/activities/sections',
+          sectionInput([ids.sectionA], 'Section A snapshot'),
+          201,
+        );
+        assert.equal(sectionA.assignedCount, 2);
+        assert.equal(sectionA.unlinkedRows, 1);
+        assert.equal(sectionA.missingMembershipRows, 1);
+        assert.equal(sectionA.rosterRows, 4);
+        sectionActivity = await api(
+          placement,
+          '/api/activities/sections',
+          sectionInput([ids.sectionA, ids.sectionB], 'Both sections snapshot'),
+          201,
+        );
+        assert.equal(sectionActivity.assignedCount, 4);
+        assert.equal(sectionActivity.unlinkedRows, 1);
+        assert.equal(sectionActivity.inactiveRows, 1);
+        assert.equal(sectionActivity.missingMembershipRows, 1);
+        assert.equal(sectionActivity.rosterRows, 7);
+        const assigned = await db.query(
+          `select student_id,count(*)::int n from public.activity_assignments
+            where activity_id=$1 group by student_id order by student_id`,
+          [sectionActivity.id],
+        );
+        assert.deepEqual(
+          assigned.rows.map((row) => row.student_id).sort(),
+          studentList.map((student) => student.id).sort(),
+        );
+        assert.ok(assigned.rows.every((row) => row.n === 1));
+        assert.equal(
+          assigned.rows.some((row) => row.student_id === unrosteredStudent.id),
+          false,
+        );
+        assert.equal(
+          assigned.rows.some((row) => row.student_id === inactiveRoster.id),
+          false,
+        );
+        assert.equal(
+          assigned.rows.some((row) => row.student_id === missingMembership.id),
+          false,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.activity_target_sections where activity_id=$1',
+              [sectionActivity.id],
+            )
+          ).rows[0].n,
+          2,
+        );
+        const history = await db.query(
+          `select action,count(*)::int n from public.activity_history
+            where activity_id=$1 group by action`,
+          [sectionActivity.id],
+        );
+        assert.equal(history.rows.find((row) => row.action === 'created').n, 1);
+        assert.equal(
+          history.rows.find((row) => row.action === 'assigned').n,
+          4,
+        );
+      },
+    );
+    await check(
+      'creator and counselor monitors use real assignments with bounded, scoped reads',
+      async () => {
+        const own = await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/monitor`,
+        );
+        assert.equal(own.totalAssigned, 4);
+        assert.equal(own.pending, 4);
+        assert.equal(own.assignments.length, 4);
+        assert.deepEqual(
+          own.assignments.map((row) => row.studentIdentifier).sort(),
+          ['051', '1042', '90001', 'S-A-17'],
+        );
+        sectionAssignment = own.assignments.find(
+          (row) => row.studentId === studentList[0].id,
+        ).assignmentId;
+        const later = await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/monitor?offset=2`,
+        );
+        assert.equal(later.totalAssigned, 4);
+        assert.equal(later.assignments.length, 2);
+        await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/monitor?offset=10001`,
+          undefined,
+          400,
+        );
+        await api(
+          teacher,
+          `/api/activities/${sectionActivity.id}/monitor`,
+          undefined,
+          403,
+        );
+        const otherCreator = await user('other-section-creator');
+        const otherResponsibility = await responsibility(
+          otherCreator,
+          'teacher',
+        );
+        noDatabaseError(
+          await admin.from('activity_capabilities').insert({
+            responsibility_id: otherResponsibility,
+            category_key: 'general',
+            can_create: true,
+          }),
+          'provision second creator without monitor ownership',
+        );
+        await api(
+          otherCreator,
+          `/api/activities/${sectionActivity.id}/monitor`,
+          undefined,
+          403,
+        );
+        await api(
+          otherCreator,
+          `/api/activities/${sectionActivity.id}`,
+          undefined,
+          404,
+        );
+        await api(
+          counselorA,
+          `/api/activities/${sectionActivity.id}/monitor`,
+          undefined,
+          403,
+        );
+        await api(
+          studentList[0],
+          `/api/activities/${sectionActivity.id}/monitor`,
+          undefined,
+          403,
+        );
+        await api(
+          unrosteredStudent,
+          `/api/activities/${sectionActivity.id}`,
+          undefined,
+          404,
+        );
+        await api(
+          unrosteredStudent,
+          `/api/activity-assignments/${sectionAssignment}/submit`,
+          {},
+          403,
+        );
+        noDatabaseError(
+          await admin
+            .from('profiles')
+            .update({ is_active: false })
+            .eq('id', studentList[3].id),
+          'temporarily deactivate assigned synthetic student',
+        );
+        try {
+          const inactive = await studentList[3].browser.request(
+            `/api/activities/${sectionActivity.id}`,
+          );
+          assert.equal(inactive.status, 403);
+        } finally {
+          noDatabaseError(
+            await admin
+              .from('profiles')
+              .update({ is_active: true })
+              .eq('id', studentList[3].id),
+            'reactivate synthetic student',
+          );
+        }
+        const forA = await api(counselorA, '/api/counselor/activities');
+        const forB = await api(counselorB, '/api/counselor/activities');
+        assert.deepEqual(
+          forA.assignments
+            .filter((row) => row.activityId === sectionActivity.id)
+            .map((row) => row.studentIdentifier)
+            .sort(),
+          ['1042', '90001', 'S-A-17'],
+        );
+        assert.deepEqual(
+          forB.assignments
+            .filter((row) => row.activityId === sectionActivity.id)
+            .map((row) => row.studentIdentifier),
+          ['051'],
+        );
+        assert.equal(
+          new Set(forA.assignments.map((row) => row.assignmentId)).size,
+          forA.assignments.length,
+        );
+        assert.equal(
+          (await api(teacher, '/api/counselor/activities')).total,
+          0,
+        );
+        deniedRead(
+          await placement.client.from('department_student_roster').select('*'),
+        );
+        deniedRead(
+          await placement.client.from('activity_target_sections').select('*'),
+        );
+        const placementCapability = await db.query(
+          `select c.responsibility_id from public.activity_capabilities c
+            join public.responsibility_assignments r on r.id=c.responsibility_id
+            where r.user_id=$1 and c.category_key='general' and c.can_create`,
+          [placement.id],
+        );
+        assert.equal(placementCapability.rows.length, 1);
+        await db.query(
+          'delete from public.activity_capabilities where responsibility_id=$1 and category_key=$2',
+          [placementCapability.rows[0].responsibility_id, 'general'],
+        );
+        try {
+          await api(
+            placement,
+            `/api/activities/${sectionActivity.id}/monitor`,
+            undefined,
+            403,
+          );
+        } finally {
+          await db.query(
+            `insert into public.activity_capabilities
+              (responsibility_id,category_key,can_create,can_verify)
+              values($1,'general',true,false)`,
+            [placementCapability.rows[0].responsibility_id],
+          );
+        }
+      },
+    );
+    await check(
+      'assigned student reports once; creator and counselor see pending verification; explicit reviewer verifies',
+      async () => {
+        await api(
+          studentList[1],
+          `/api/activity-assignments/${sectionAssignment}/submit`,
+          {},
+          403,
+        );
+        await api(
+          studentList[0],
+          `/api/activity-assignments/${sectionAssignment}/submit`,
+          {},
+        );
+        await api(
+          studentList[0],
+          `/api/activity-assignments/${sectionAssignment}/submit`,
+          {},
+          409,
+        );
+        let own = await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/monitor`,
+        );
+        assert.equal(own.awaitingVerification, 1);
+        assert.equal(own.verified, 0);
+        assert.equal(own.pending, 3);
+        assert.equal(
+          (await api(counselorA, '/api/counselor/activities')).assignments.find(
+            (row) => row.assignmentId === sectionAssignment,
+          ).state,
+          'reported',
+        );
+        await api(
+          placement,
+          `/api/activity-assignments/${sectionAssignment}/verify`,
+          {},
+          403,
+        );
+        const reviewer = await user('section-reviewer');
+        const reviewerResponsibility = await responsibility(
+          reviewer,
+          'teacher',
+        );
+        noDatabaseError(
+          await admin.from('activity_capabilities').insert({
+            responsibility_id: reviewerResponsibility,
+            category_key: 'general',
+            can_verify: true,
+          }),
+          'provision explicit department verification capability',
+        );
+        await api(
+          reviewer,
+          `/api/activity-assignments/${sectionAssignment}/verify`,
+          {},
+        );
+        own = await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/monitor`,
+        );
+        assert.equal(own.awaitingVerification, 0);
+        assert.equal(own.verified, 1);
+        const fresh = new AppBrowser(config.appOrigin);
+        await fresh.login(studentList[0]);
+        const reloaded = await fresh.request(
+          `/api/activities/${sectionActivity.id}`,
+        );
+        assert.equal(reloaded.status, 200);
+        const activity = (await reloaded.json()).activity;
+        assert.equal(
+          activity.assignments.find((row) => row.id === sectionAssignment)
+            .completion.state,
+          'verified',
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.activity_completions where assignment_id=$1',
+              [sectionAssignment],
+            )
+          ).rows[0].n,
+          1,
+        );
+        const concurrentAssignment = own.assignments.find(
+          (row) => row.studentId === studentList[2].id,
+        ).assignmentId;
+        const raced = await Promise.all([
+          studentList[2].client.rpc('submit_activity', {
+            p_assignment: concurrentAssignment,
+          }),
+          studentList[2].client.rpc('submit_activity', {
+            p_assignment: concurrentAssignment,
+          }),
+        ]);
+        assert.equal(raced.filter((response) => !response.error).length, 1);
+        assert.equal(
+          raced.filter((response) => response.error?.code === '23505').length,
+          1,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.activity_completions where assignment_id=$1',
+              [concurrentAssignment],
+            )
+          ).rows[0].n,
+          1,
+        );
+      },
+    );
+    await check(
+      'invalid targets and dates, unauthorized creator, and database failure leave no partial activity',
+      async () => {
+        await api(
+          teacher,
+          '/api/activities/sections',
+          sectionInput([ids.sectionA], 'Unauthorized section'),
+          403,
+        );
+        await api(
+          studentList[0],
+          '/api/activities/sections',
+          sectionInput([ids.sectionA], 'Student section'),
+          403,
+        );
+        await api(
+          placement,
+          '/api/activities/sections',
+          sectionInput([ids.outside], 'Outside section'),
+          400,
+        );
+        await api(
+          placement,
+          '/api/activities/sections',
+          sectionInput([ids.sectionA, ids.sectionA], 'Duplicate section'),
+          400,
+        );
+        const badDate = sectionInput([ids.sectionA], 'Bad date');
+        badDate.deadlineAt = badDate.startsAt;
+        await api(placement, '/api/activities/sections', badDate, 400);
+        await api(
+          placement,
+          '/api/activities/sections',
+          {
+            ...sectionInput([ids.sectionA], 'No manual targets'),
+            studentIds: [studentList[0].id],
+          },
+          400,
+        );
+        await db.query(
+          `create function public.${ids.activityFailureFunction}() returns trigger
+             language plpgsql as $$ begin if new.action='created' and new.activity_id in
+               (select id from public.activities where title='Forced section history failure')
+               then raise exception 'synthetic history failure'; end if; return new; end $$`,
+        );
+        await db.query(
+          `create trigger ${ids.activityFailureTrigger} before insert on public.activity_history
+            for each row execute function public.${ids.activityFailureFunction}()`,
+        );
+        try {
+          await api(
+            placement,
+            '/api/activities/sections',
+            sectionInput([ids.sectionA], 'Forced section history failure'),
+            503,
+          );
+        } finally {
+          await db.query(
+            `drop trigger if exists ${ids.activityFailureTrigger} on public.activity_history`,
+          );
+          await db.query(
+            `drop function if exists public.${ids.activityFailureFunction}()`,
+          );
+        }
+        assert.equal(
+          (
+            await db.query(
+              `select count(*)::int n from public.activities
+                 where created_by=$1 and title='Forced section history failure'`,
+              [placement.id],
+            )
+          ).rows[0].n,
+          0,
+        );
+      },
+    );
+
     await check(
       'reassignment and revocation preserve history while active and inactive counselor views change',
       async () => {
@@ -668,6 +1133,30 @@ async function main() {
           newAccess.students.map((x) => x.student.external_student_id).sort(),
           ['051', '1042'],
         );
+        const oldActivityAccess = await api(
+          counselorA,
+          '/api/counselor/activities',
+        );
+        const newActivityAccess = await api(
+          counselorB,
+          '/api/counselor/activities',
+        );
+        assert.equal(
+          oldActivityAccess.assignments.some(
+            (row) =>
+              row.activityId === sectionActivity.id &&
+              row.studentIdentifier === '1042',
+          ),
+          false,
+        );
+        assert.equal(
+          newActivityAccess.assignments.some(
+            (row) =>
+              row.activityId === sectionActivity.id &&
+              row.studentIdentifier === '1042',
+          ),
+          true,
+        );
         assert.equal(
           (
             await db.query(
@@ -702,6 +1191,12 @@ async function main() {
         assert.deepEqual(
           activeOnly.students.map((x) => x.student.external_student_id),
           ['S-A-17'],
+        );
+        assert.equal(
+          (await api(counselorA, '/api/counselor/activities')).assignments.some(
+            (row) => row.studentIdentifier === '90001',
+          ),
+          false,
         );
         assert.equal(
           (
@@ -1110,11 +1605,17 @@ async function main() {
     if (connected) {
       try {
         await db.query(
+          `drop trigger if exists ${ids.activityFailureTrigger} on public.activity_history; drop function if exists public.${ids.activityFailureFunction}();`,
+        );
+        await db.query(
           `drop trigger if exists ${ids.auditFailureTrigger} on public.department_directory_audit; drop function if exists public.${ids.auditFailureFunction}();`,
         );
         await db.query(
-          'delete from public.activities where scope_id=any($1::uuid[])',
-          [[ids.sectionA, ids.sectionB]],
+          'delete from public.activities where created_by=any($1::uuid[]) and scope_id=any($2::uuid[])',
+          [
+            users.map((x) => x.id),
+            [ids.department, ids.sectionA, ids.sectionB],
+          ],
         );
         await db.query(
           'delete from public.counselor_student_mappings where roster_student_id in(select id from public.department_student_roster where department_scope_id=$1)',

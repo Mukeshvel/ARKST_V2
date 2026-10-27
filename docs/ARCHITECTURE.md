@@ -10,7 +10,8 @@ Milestone 2 adds real Supabase Auth integration code, a protected own-profile pa
 an own-profile API, session handling, SQL migrations and executable identity/RLS tests.
 Milestone 2.1 verified these flows against local Supabase. Milestones 3A and 3B-1 add
 the shared Activity API, structured department roster, trusted counselor mappings and
-staff self-service. See PROJECT_STATUS for executed regression checks,
+staff self-service. Milestone 3B-2A adds section-snapshot publication and narrow
+creator/counselor monitoring over the same assignments and completions. See PROJECT_STATUS for executed regression checks,
 [ACTIVITY_ENGINE](ACTIVITY_ENGINE.md) and [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md).
 
 - `src/app`: public status page, local login form, protected profile rendering,
@@ -95,9 +96,21 @@ table mutations are revoked, including history edits. Read RLS filters activitie
 assignments, completion and history independently, including nested REST requests.
 
 Privileged functions pin an empty search path, qualify relations and derive the actor
-from auth.uid(). Four helpers are in a schema not exposed by PostgREST. Only the three
-intentional mutation RPCs are exposed; anonymous execution is revoked. Membership
+from auth.uid(). Private helpers are in a schema not exposed by PostgREST. Only the
+intentional mutation and monitoring RPCs are exposed; anonymous execution is revoked. Membership
 and capability tables have no ordinary-client grants or management routes.
+
+## Milestone 3B-2A section Activity flow
+
+The section publication RPC validates each selected section under the approved
+department, checks the caller's current CREATE capability for each, then selects
+eligible active, linked roster students with current section membership in PostgreSQL.
+It records one Activity, its selected-section metadata, existing per-student assignments
+and history atomically. Student reporting and verification use the existing functions
+and completion table. The creator monitor checks current creator/section authority;
+the counselor monitor checks trusted current mappings and active students independent
+of who created the Activity. Both return bounded pages. The client never receives a
+service-role key or arbitrary roster query facility.
 
 ## Future academic workflows — not implemented
 

@@ -9,29 +9,31 @@ select no_plan();
 
 select ok((select relrowsecurity from pg_class where oid = ('public.' || name)::regclass), name || ' enables RLS')
 from unnest(array['activity_categories', 'student_scope_memberships', 'activity_capabilities',
-  'activities', 'activity_assignments', 'activity_completions', 'activity_history']) name;
+  'activities', 'activity_assignments', 'activity_completions', 'activity_history', 'activity_target_sections']) name;
 select ok(not has_table_privilege('authenticated', 'public.' || name, 'INSERT,UPDATE,DELETE'), name || ' denies direct authenticated writes')
 from unnest(array['activity_categories', 'student_scope_memberships', 'activity_capabilities',
-  'activities', 'activity_assignments', 'activity_completions', 'activity_history']) name;
+  'activities', 'activity_assignments', 'activity_completions', 'activity_history', 'activity_target_sections']) name;
 select ok(not has_table_privilege('anon', 'public.' || name, 'SELECT'), name || ' denies anonymous reads')
 from unnest(array['activity_categories', 'student_scope_memberships', 'activity_capabilities',
-  'activities', 'activity_assignments', 'activity_completions', 'activity_history']) name;
+  'activities', 'activity_assignments', 'activity_completions', 'activity_history', 'activity_target_sections']) name;
 select ok(not has_table_privilege('authenticated', 'public.student_scope_memberships', 'SELECT'), 'no student roster grant');
 select ok(not has_table_privilege('authenticated', 'public.activity_capabilities', 'SELECT'), 'no capability directory grant');
 select ok(not has_function_privilege('anon', 'public.' || signature, 'EXECUTE'), signature || ' denies anonymous execution')
-from unnest(array['create_activity(text,uuid,text,text,timestamptz,timestamptz,timestamptz,boolean,uuid[])', 'submit_activity(uuid)', 'verify_activity(uuid)']) signature;
+from unnest(array['create_activity(text,uuid,text,text,timestamptz,timestamptz,timestamptz,boolean,uuid[])', 'submit_activity(uuid)', 'verify_activity(uuid)',
+  'create_section_activity(text,uuid,uuid[],text,text,timestamptz,timestamptz,timestamptz,boolean)',
+  'monitor_created_activity(uuid,integer)', 'monitor_counselor_activities(integer)']) signature;
 select ok('search_path=""' = any(p.proconfig), p.proname || ' has fixed empty search path')
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'activity_private' or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity'));
+where n.nspname = 'activity_private' or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity','create_section_activity','monitor_created_activity','monitor_counselor_activities'));
 select ok(p.prosecdef and 'search_path=""' = any(p.proconfig), p.proname || ' remains a fixed-path SECURITY DEFINER')
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-where (n.nspname='activity_private' and p.proname in ('active_kind','can_manage','can_read_activity','can_read_assignment','can_self_edit_staff','can_see_roster','validate_directory_relationships','guard_mapped_responsibility','guard_directory_scope'))
-   or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity','update_staff_directory_profile','staff_available_sections'));
+where (n.nspname='activity_private' and p.proname in ('active_kind','can_manage','can_read_activity','can_read_assignment','can_self_edit_staff','can_see_roster','validate_directory_relationships','guard_mapped_responsibility','guard_directory_scope','can_monitor_created'))
+   or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity','update_staff_directory_profile','staff_available_sections','create_section_activity','monitor_created_activity','monitor_counselor_activities'));
 select is((select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   where p.prosecdef and 'search_path=""'=any(p.proconfig)
-    and ((n.nspname='activity_private' and p.proname in ('active_kind','can_manage','can_read_activity','can_read_assignment','can_self_edit_staff','can_see_roster','validate_directory_relationships','guard_mapped_responsibility','guard_directory_scope'))
-      or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity','update_staff_directory_profile','staff_available_sections')))),
-  14::bigint,'all required elevated functions exist as fixed-path SECURITY DEFINER');
+    and ((n.nspname='activity_private' and p.proname in ('active_kind','can_manage','can_read_activity','can_read_assignment','can_self_edit_staff','can_see_roster','validate_directory_relationships','guard_mapped_responsibility','guard_directory_scope','can_monitor_created'))
+      or (n.nspname='public' and p.proname in ('create_activity','submit_activity','verify_activity','update_staff_directory_profile','staff_available_sections','create_section_activity','monitor_created_activity','monitor_counselor_activities')))),
+  18::bigint,'all required elevated functions exist as fixed-path SECURITY DEFINER');
 select ok(not p.prosecdef and 'search_path=""' = any(p.proconfig),'valid_subjects remains reviewed invoker with fixed path')
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='activity_private' and p.proname='valid_subjects';

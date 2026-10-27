@@ -71,16 +71,18 @@ temporary fixtures; no standing staff grants were seeded by the migration.
   during the configured submission window, and cannot verify or browse other students.
 - A staff member with a current create capability may create within that exact scope
   and category only after every active student has a current exact-scope membership.
-- A staff member with either create or verify capability can read activities, assigned
-  student UUIDs, completion and history within that exact scope/category, including work
-  created by another authorized staff member there. This does not reveal student profiles
-  or an unassigned roster. Creator ownership alone does not preserve access after revocation.
+- For original direct-target Activities, a staff member with either create or verify
+  capability can read Activity assignments/completions within that exact scope/category.
+  Section-snapshot Activities narrow this: the creator may monitor their own Activity
+  while current CREATE approval covers every selected section; an independent exact-scope
+  VERIFY approval retains review/read access. No CREATE grant opens an unrelated
+  section-snapshot Activity or an unassigned roster. Creator access ends after revocation.
 - A verify capability permits reported → verified only when verification is required.
   Create capability alone is insufficient. No pending → verified or self-review exists.
 - Staff with only counselor/HOD/admin or another role name have no Activity authority.
   Capabilities are never combined across responsibility scopes or categories.
 
-Direct client writes to all seven new tables are revoked. The three mutation RPCs
+Direct client writes to the Activity and selected-section tables are revoked. The mutation RPCs
 perform authorization explicitly and save history atomically. Read RLS still applies
 to direct REST queries. Privileged database owners/service-role operators can bypass
 these boundaries; audit history is append-only for application users, not tamper-proof
@@ -116,6 +118,17 @@ for the exact department and a loopback database URL, but uses a database-owner 
 for transactions; the database owner remains trusted and can bypass RLS. Keep that
 credential protected. HOD/Admin policy is still controlled separately; no HOD privilege
 is inferred from a designation string. See [DEPARTMENT_DIRECTORY](DEPARTMENT_DIRECTORY.md).
+
+## Milestone 3B-2A monitoring boundary
+
+The section publication RPC accepts only a department and selected direct child
+sections, then snapshots eligible active linked roster students with current section
+membership into the existing assignment table. The monitor for its creator returns
+only that Activity's assigned students and states, with bounded pagination. A counselor
+monitor uses administrator-managed current counselor mappings and active roster rows to
+show only that counselor's students' assigned Activities, regardless of creator. This
+mapping does not grant broad Activity READ, CREATE or VERIFY. Student submissions and
+reviewer verification retain the 3A authorization and unique completion record.
 
 ## Future role-to-capability policy — provisional and not implemented
 

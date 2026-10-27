@@ -158,6 +158,15 @@ create counselor access. Roster reads exclude institutional email and creator da
 column-grant layer. A counselor does not gain student Auth profiles, unrelated students
 or any Activity capability from this mapping alone.
 
+Milestone 3B-2A also exposes `GET /api/counselor/activities?offset=0`. A fixed-path
+database RPC joins only current approved mappings, current counselor responsibilities,
+active roster rows and active linked student profiles to existing Activity assignments
+and completion rows. Each response page contains at most 50 assigned Activity/status
+rows and omits student email. It includes work published by other authorized staff,
+without making counselor access an Activity CREATE, general READ or VERIFY grant.
+Reassignment and revocation remove the old counselor's ordinary current view; historical
+mapping, Activity and completion records remain stored.
+
 ## Verification and limits
 
 Real local integration tests preview/apply roster and counselor CSVs, validate rollback

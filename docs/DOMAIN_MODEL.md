@@ -76,6 +76,11 @@ remain proposals. IDs are server-generated; timestamps are UTC instants.
 
 ## Dynamic groups and targeting
 
+Milestone 3B-2A implements only concrete section selection as a publication-time
+snapshot. `activity_target_sections` records selected sections, while the existing
+`activity_assignments` rows remain the durable per-student obligations and share the
+same `activity_completions` and history. This is separate from future dynamic groups.
+
 Recommendation (provisional): allowlisted structured predicates such as branch, cohort
 and counselor assignment; never arbitrary SQL or client-authored executable predicates.
 Evaluate membership server-side. Preview recipient count only within authorized scope.

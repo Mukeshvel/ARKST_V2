@@ -1,4 +1,4 @@
-# Activity engine — Milestone 3A
+# Activity engine — Milestones 3A and 3B-2A
 
 The shared PostgreSQL model supports assignment, weekly_test, nptel, seminar,
 mini_project, placement and general. A trusted operator can add category rows without
@@ -147,7 +147,7 @@ Auth suite is required separately. See PROJECT_STATUS.md for observed results.
 
 ## Limits and next decisions
 
-No group/dynamic targeting, counselor oversight workflow, dashboards, notifications,
+No group/dynamic targeting, counselor follow-up workflow, dashboards, notifications,
 follow-up, catch-up, recurrence generation, editing/cancellation, evidence uploads or
 rejection/resubmission exists. Direct assignments and history provide stable references
 for future work. No profile roster endpoint or administrative/delegation tool exists.
@@ -164,3 +164,69 @@ Before another milestone, review/approve the real role-to-capability matrix and 
 student membership source, deadline/late-work policy, reviewer process and retention.
 No standing college permissions are invented here. Stop at 3A; 3B/deployment/commit/push
 require a separate instruction.
+
+## Milestone 3B-2A: section snapshot and monitoring
+
+The forward-only `20261027000600_section_activity_monitoring.sql` migration adds
+`activity_target_sections` as the selected section metadata for a publication. The
+`create_section_activity` RPC derives the audience from active roster rows in the
+selected department and sections. A student must also have a linked active student
+profile and a current exact-section membership. Unlinked, inactive and missing-membership
+rows are counted in the creation response, not assigned. A student with membership but
+no roster row is also excluded. The RPC inserts one Activity, distinct rows in the
+existing `activity_assignments` table, and actor/time history in one transaction. The
+unique `(activity_id, student_id)` constraint remains the final duplicate guard. Future
+roster or membership edits do not silently rewrite that assignment snapshot.
+
+The new authenticated routes are:
+
+| Method and path                             | Result                                                                                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/activities/sections`             | Create one Activity for 1–20 distinct direct child sections. Returns its id, assigned count and excluded roster counts. |
+| `GET /api/activities/{id}/monitor?offset=0` | Creator's assigned-student page and full counts. Requires current authorization; up to 50 rows per page.                |
+| `GET /api/counselor/activities?offset=0`    | Current mapped students' assigned Activity/status page across all creators; up to 50 rows per page.                     |
+
+Example create body, with illustrative IDs and UTC dates:
+
+```json
+{
+  "category": "general",
+  "departmentScopeId": "10000000-0000-4000-8000-000000000001",
+  "sectionIds": [
+    "20000000-0000-4000-8000-000000000001",
+    "20000000-0000-4000-8000-000000000002"
+  ],
+  "title": "Section activity",
+  "description": "Instructions",
+  "startsAt": "2026-11-02T03:30:00Z",
+  "deadlineAt": "2026-11-02T04:30:00Z",
+  "endsAt": "2026-11-02T05:30:00Z",
+  "requiresVerification": true
+}
+```
+
+The API rejects manual student IDs in this route. A single-section Activity has that
+section as its scope; a multi-section Activity has the department as its scope, with
+the selected sections retained in `activity_target_sections`. A current department
+CREATE capability can reach its direct child sections; every selected section must
+pass the CREATE check. It confers no general roster read or VERIFY capability. For
+these section-snapshot Activities, the creator gets narrow result access only while
+their current CREATE approval still covers every selected section. An independent
+exact-scope VERIFY capability also supports normal review/read. The original 3A
+direct-activity exact-scope reads are preserved. The creator monitor returns total,
+self-reported completed for nonverification work, awaiting verification, verified,
+pending and overdue counts. It reads the same completion rows that students update.
+
+Counselor monitoring is separate from Activity CREATE/READ/VERIFY grants. It joins
+current administrator-managed counselor mappings, current counselor responsibilities,
+active roster rows and active student profiles to the same assignments/completions.
+Reassignment or revocation changes ordinary current visibility while stored assignments,
+completed work and mapping history remain. Profile text and section preferences cannot
+create counselor access. The monitor does not expose student email or unrestricted
+private profiles.
+
+All three RPCs derive the caller from the real Auth session, use fixed empty search
+paths, are granted only to `authenticated`, and return a bounded page. No extra
+completion pool or client-side success simulation exists. Section targeting is a
+publication-time snapshot; retroactive enrollment reconciliation, cancellation,
+group targeting, reviewer assignment policy and dashboard UI remain future work.

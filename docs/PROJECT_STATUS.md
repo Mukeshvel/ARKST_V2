@@ -1,6 +1,6 @@
-# Project status — Milestone 3B-1, 2026-10-27
+# Project status — through Milestone 3B-2A, 2026-10-27
 
-Milestone 3B-1 adds a structured department roster, trusted counselor-student mappings and faculty self-service to the preserved identity and Activity foundation. Synthetic-data verification passed locally against Supabase. No actual departmental roster or production accounts were imported or created. This is not production readiness. Milestone 3B-2 and later work have not started.
+The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
 ## Baseline and preservation
 
@@ -93,3 +93,62 @@ grant alone. Existing completion and verification regression groups continue pas
 `git diff --check` passed and the tree remains unstaged on `main`. A read-only local
 PostgreSQL count found zero `arkst-dir-*` Auth users, matching directory audit rows and
 named placement test activities after the final suite.
+
+## Milestone 3B-2A section assignment and monitoring — 2026-10-27
+
+Started from clean approved commit `497a97d` on `main` and created the local
+`codex/milestone-3b-2a` branch. There is no commit or push. Forward-only migration
+`20261027000600_section_activity_monitoring.sql` was applied to the existing local
+Supabase database with `npx supabase migration up --local`; no reset or remote access.
+
+An authenticated creator now calls `POST /api/activities/sections` with the approved
+department and Section A, B or both. The database validates current CREATE approval
+for every selected section and snapshots only active, linked roster students with an
+active profile and current exact-section membership into the existing assignment and
+history tables. Creation returns assigned and excluded-roster counts. The creator's
+`GET /api/activities/{id}/monitor` gives bounded results for that Activity while
+current authority remains. `GET /api/counselor/activities` uses only current trusted
+mapping, responsibility, active roster and student records to show the counselor's
+students' work, including activities created by other staff. These reads use the same
+completion table as student submission and reviewer verification. No separate
+completion pool, group evaluator or production account provisioning was added.
+
+The new table denies ordinary direct reads/writes. New privileged functions have
+fixed empty search paths, authenticated-only grants, caller-derived identity and
+named SECURITY DEFINER assertions. Existing direct Activity READ/VERIFY exact-scope
+semantics remain; the creator's new section-snapshot result access is restricted to
+their own publication and revoked with CREATE approval. CREATE does not grant general
+roster access or verification. Counselor access grants neither CREATE nor VERIFY.
+
+| Executed command                                                                                  | Result                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --local` | PASS: applied `00600` to existing local DB without reset.                                                                                     |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`                  | PASS: 3 files, 160 pgTAP assertions.                                                                                                          |
+| `npm run typecheck && npm run lint`                                                               | PASS after implementation.                                                                                                                    |
+| `npm run build`                                                                                   | PASS; new production API routes compiled.                                                                                                     |
+| `npm run check`                                                                                   | PASS: format, typecheck, lint, 88 Vitest tests, 10 helper safety tests and production build.                                                  |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                         | PASS: smoke, 12 identity, 16 Activity and 16 directory groups with real Auth/HTTP/PostgreSQL/RLS; synthetic fixture cleanup reported success. |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- directory`            | PASS after expanded inactive/unlinked/missing-roster/membership cases: smoke and 16 directory groups; cleanup reported success.               |
+| `git diff --check`                                                                                | PASS; no whitespace errors.                                                                                                                   |
+
+The local suite verified one Section A and one Both Activity, no duplicate assignments,
+roster exclusion counts, scoped creator and counselor pages, inactive/unassigned denial,
+reassignment/revocation, one persisted completion, concurrent duplicate rejection,
+reported-versus-verified status, explicit verifier authority, invalid requests and
+a forced database history failure with full transaction rollback. The preexisting
+identity and Activity suites also passed in the combined run. SQL tests assert RLS,
+anonymous denial and the named elevated-function/search-path contract.
+
+One edit to fixture cleanup was rejected by automatic review because a department-wide
+delete could affect unrelated local Activities; cleanup was narrowed to records created
+by the synthetic users. Prettier then found a quoted string syntax error in the newly
+added test fixture; it was fixed before the successful focused run. The forced history
+failure deliberately logged PostgreSQL `P0001`, returned 503, and left no partial
+Activity. No health checks were bypassed.
+
+Limits: this is a backend API without teacher/student dashboards, production roster,
+hosted OAuth or deployment verification. Section selection is a publication-time
+snapshot; later roster changes do not automatically add/remove existing assignments.
+The 50-row monitor pages use numeric offsets capped at 10,000; large historical data
+and concurrent writes may require cursor pagination later. Group targeting, automatic
+recurrence, cancellation, notifications, follow-up and catch-up remain unimplemented.
