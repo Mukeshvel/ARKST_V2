@@ -230,3 +230,26 @@ paths, are granted only to `authenticated`, and return a bounded page. No extra
 completion pool or client-side success simulation exists. Section targeting is a
 publication-time snapshot; retroactive enrollment reconciliation, cancellation,
 group targeting, reviewer assignment policy and dashboard UI remain future work.
+
+## Milestone 3B-2B: browser workflows
+
+The student dashboard lists only RLS-visible own assignments and history, classifies
+upcoming/current/overdue/reported/awaiting/verified from saved Activity dates and
+completion state, and submits through the existing `submit_activity` path. It reloads
+the saved Activity after a successful report. Verification-required reports remain
+awaiting review. Lists and history are paginated at 50 rows; filters describe the
+current page rather than claiming all historical work has been loaded.
+
+The faculty dashboard retrieves section/category choices from the forward-only
+`20261027000700_activity_creation_options.sql` function. Its aggregate eligible
+counts come from the active linked roster and current membership; these are a
+current estimate, not a reserved assignment count. Publication still goes through
+`create_section_activity` and returns the committed assigned/excluded counts. A
+failed save retains entered form data and shows the API error. The own-created list
+and summary are lightweight RLS-filtered reads; the result page uses the bounded
+creator monitor. It has no Verify button, because CREATE alone grants no verification.
+
+The counselor dashboard uses the current mapping RLS endpoint (now paginated) and
+the existing shared Activity/completion monitor. It cannot edit mapping or completion
+records. Each screen checks the real session; its API enforces the underlying scope.
+The UI adds no academic role policy, separate test engine or completion pool.

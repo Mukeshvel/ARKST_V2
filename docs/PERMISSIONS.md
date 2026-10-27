@@ -130,6 +130,13 @@ show only that counselor's students' assigned Activities, regardless of creator.
 mapping does not grant broad Activity READ, CREATE or VERIFY. Student submissions and
 reviewer verification retain the 3A authorization and unique completion record.
 
+The 3B-2B creation-options RPC shows only section/category combinations for which
+the current caller passes CREATE and returns aggregate eligible counts. A form option
+is never an authorization token; the publication RPC rechecks every scope and student.
+Dashboard navigation may show faculty and counselor links for one staff account, but
+all data requests still pass the existing server session checks and RLS or scoped RPCs.
+The faculty result screen is read only, including for a creator without VERIFY.
+
 ## Future role-to-capability policy — provisional and not implemented
 
 | Responsibility        | Proposed capability and scope                                                                                  |

@@ -7,6 +7,22 @@ export class DirectoryError extends Error {
   }
 }
 
+export function directoryOffset(url: string): number {
+  const query = new URL(url).searchParams;
+  const value = query.get('offset') ?? '0';
+  if (
+    [...query.keys()].some((key) => key !== 'offset') ||
+    query.getAll('offset').length > 1 ||
+    !/^\d{1,5}$/.test(value) ||
+    Number(value) > 10000
+  )
+    throw new DirectoryError(
+      400,
+      'Only an offset from 0 to 10000 is accepted.',
+    );
+  return Number(value);
+}
+
 export function staffDirectoryInput(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new DirectoryError(400, 'Expected an object.');

@@ -112,12 +112,34 @@ the counselor monitor checks trusted current mappings and active students indepe
 of who created the Activity. Both return bounded pages. The client never receives a
 service-role key or arbitrary roster query facility.
 
+## Milestone 3B-2B operational dashboards
+
+Protected `/dashboard/student`, `/dashboard/faculty` and `/dashboard/counselor`
+pages verify the existing session and active profile on the server. Faculty staff can
+open both operational views when they also have a current counselor responsibility;
+navigation is a convenience, not a permission grant. Client components fetch only
+the existing cookie-authenticated APIs and show server errors. The student view reads
+RLS-filtered assignments and history, submits through the existing completion RPC,
+then reloads the persisted Activity. Faculty creation uses the section publication
+RPC and a narrow `activity_creation_options` RPC; that read-only function exposes
+only currently CREATE-authorized category/section combinations and aggregate eligible
+counts. Publication checks authorization and recipients again. Creator and counselor
+results use the 3B-2A monitoring functions and bounded pages. No service key reaches
+browser code.
+
+`GET /api/activities/created` and `GET /api/activities/{id}/summary` are lightweight
+RLS-filtered reads for the faculty view. The counselor roster endpoint now returns
+50 rows per page and a real RLS-filtered count. A real headless Edge integration
+flow signs in through Supabase Auth, publishes, reports completion, reloads, and
+checks the creator and counselor views. See PROJECT_STATUS for executed results.
+
 ## Future academic workflows — not implemented
 
 Groups/dynamic membership, recurrence generation, activity editing/cancellation,
 announcements, notifications, counselor follow-up and catch-up remain future work.
 They can reference the same Activity and assignment IDs. Group targeting is rejected,
-not expanded into simulated recipients. No teacher/student dashboard is implemented.
+not expanded into simulated recipients. Reviewer verification remains an API operation;
+the current dashboards display accurate read-only review status.
 
 References: [Supabase Next.js SSR guidance](https://supabase.com/docs/guides/auth/server-side/creating-a-client),
 [SSR stability status](https://supabase.com/docs/guides/auth/server-side),

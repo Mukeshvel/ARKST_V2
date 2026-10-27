@@ -57,6 +57,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/profile/:path*',
+    '/dashboard/:path*',
     '/api/me/:path*',
     '/api/activities/:path*',
     '/api/activity-assignments/:path*',

@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import pg from 'pg';
+import { chromium, expect } from '@playwright/test';
 import {
   AppBrowser,
   deniedRead,
@@ -195,6 +196,7 @@ async function main() {
     await responsibility(deniedOperator, 'teacher');
     const counselorA = await user('counselor-a');
     const counselorAResp = await responsibility(counselorA, 'counselor');
+    await responsibility(counselorA, 'teacher');
     const counselorB = await user('counselor-b');
     const counselorBResp = await responsibility(counselorB, 'counselor');
     const teacher = await user('teacher');
@@ -534,6 +536,28 @@ async function main() {
           'provisioned staff signs in through Supabase Auth',
         );
         await placement.browser.login(placement);
+        const creationOptions = await api(placement, '/api/activities/options');
+        assert.deepEqual(
+          creationOptions.options
+            .map((option) => [
+              option.section_id,
+              option.category_key,
+              option.eligible_count,
+            ])
+            .sort(),
+          [
+            [ids.sectionA, 'general', 2],
+            [ids.sectionB, 'general', 2],
+          ].sort(),
+        );
+        assert.deepEqual(
+          (await api(teacher, '/api/activities/options')).options,
+          [],
+        );
+        assert.deepEqual(
+          (await api(studentList[0], '/api/activities/options')).options,
+          [],
+        );
         assert.equal(
           (
             await db.query(
@@ -693,6 +717,24 @@ async function main() {
         assert.equal(sectionActivity.inactiveRows, 1);
         assert.equal(sectionActivity.missingMembershipRows, 1);
         assert.equal(sectionActivity.rosterRows, 7);
+        const ownList = await api(placement, '/api/activities/created');
+        assert.equal(ownList.total, 2);
+        assert.deepEqual(
+          ownList.activities.map((item) => item.id).sort(),
+          [sectionA.id, sectionActivity.id].sort(),
+        );
+        const summary = await api(
+          placement,
+          `/api/activities/${sectionActivity.id}/summary`,
+        );
+        assert.equal(summary.activity.title, 'Both sections snapshot');
+        assert.equal(summary.activity.assignments, undefined);
+        await api(
+          teacher,
+          `/api/activities/${sectionActivity.id}/summary`,
+          undefined,
+          404,
+        );
         const assigned = await db.query(
           `select student_id,count(*)::int n from public.activity_assignments
             where activity_id=$1 group by student_id order by student_id`,
@@ -796,6 +838,8 @@ async function main() {
           undefined,
           404,
         );
+        const otherList = await api(otherCreator, '/api/activities/created');
+        assert.equal(otherList.total, 0);
         await api(
           counselorA,
           `/api/activities/${sectionActivity.id}/monitor`,
@@ -1083,6 +1127,442 @@ async function main() {
           ).rows[0].n,
           0,
         );
+      },
+    );
+    await check(
+      'empty active section roster reports zero eligible options and rejects zero-assignment publication',
+      async () => {
+        await db.query(
+          'update public.department_student_roster set active=false where department_scope_id=$1 and section_scope_id=$2',
+          [ids.department, ids.sectionA],
+        );
+        try {
+          const options = await api(placement, '/api/activities/options');
+          assert.equal(
+            options.options.find((row) => row.section_id === ids.sectionA)
+              .eligible_count,
+            0,
+          );
+          const browser = await chromium.launch({
+            channel: 'msedge',
+            headless: true,
+          });
+          try {
+            const page = await browser.newPage();
+            await page.goto(`${config.appOrigin}/login`);
+            await page.getByLabel('Email').fill(placement.email);
+            await page.getByLabel('Password').fill(placement.password);
+            await page
+              .getByRole('button', { name: 'Sign in to local Supabase' })
+              .click();
+            await page.goto(`${config.appOrigin}/dashboard/faculty`);
+            await expect(
+              page.getByRole('checkbox', { name: /Section A/ }),
+            ).toBeVisible();
+            await page.getByRole('checkbox', { name: /Section A/ }).check();
+            await expect(page.locator('.dashboard-alert')).toContainText(
+              'No eligible students',
+            );
+            await expect(
+              page.getByRole('button', {
+                name: 'Publish to selected sections',
+              }),
+            ).toBeDisabled();
+          } finally {
+            await browser.close();
+          }
+          await api(
+            placement,
+            '/api/activities/sections',
+            sectionInput([ids.sectionA], 'Empty section publication'),
+            400,
+          );
+          assert.equal(
+            (
+              await db.query(
+                "select count(*)::int n from public.activities where created_by=$1 and title='Empty section publication'",
+                [placement.id],
+              )
+            ).rows[0].n,
+            0,
+          );
+        } finally {
+          await db.query(
+            'update public.department_student_roster set active=true where department_scope_id=$1 and section_scope_id=$2',
+            [ids.department, ids.sectionA],
+          );
+        }
+      },
+    );
+    await check(
+      'protected dashboard shells follow real identity and one staff account can navigate both faculty and counselor views',
+      async () => {
+        const anonymous = new AppBrowser(config.appOrigin);
+        const denied = await anonymous.request('/dashboard/student');
+        assert.equal(denied.status, 307);
+        assert.equal(
+          new URL(denied.headers.get('location'), config.appOrigin).pathname,
+          '/login',
+        );
+        const studentPage =
+          await studentList[0].browser.request('/dashboard/student');
+        assert.equal(studentPage.status, 200);
+        assert.match(await studentPage.text(), /My activities/);
+        const facultyPage =
+          await placement.browser.request('/dashboard/faculty');
+        assert.equal(facultyPage.status, 200);
+        assert.match(await facultyPage.text(), /Create one activity/);
+        const counselorPage = await counselorA.browser.request(
+          '/dashboard/counselor',
+        );
+        assert.equal(counselorPage.status, 200);
+        const counselorHtml = await counselorPage.text();
+        assert.match(counselorHtml, /My counseling students/);
+        assert.match(counselorHtml, /Faculty activities/);
+        assert.match(counselorHtml, /Counselor view/);
+      },
+    );
+    await check(
+      'explicit category approvals expose the same shared section Activity engine for academic categories',
+      async () => {
+        const categoryCreator = await user('category-creator');
+        const responsibilityId = await responsibility(
+          categoryCreator,
+          'teacher',
+        );
+        const categories = [
+          'assignment',
+          'weekly_test',
+          'nptel',
+          'placement',
+          'seminar',
+          'mini_project',
+        ];
+        noDatabaseError(
+          await admin.from('activity_capabilities').insert(
+            categories.map((category) => ({
+              responsibility_id: responsibilityId,
+              category_key: category,
+              can_create: true,
+            })),
+          ),
+          'approve synthetic categories independently',
+        );
+        const options = await api(categoryCreator, '/api/activities/options');
+        assert.deepEqual(
+          [...new Set(options.options.map((row) => row.category_key))].sort(),
+          categories.sort(),
+        );
+        assert.equal(options.options.length, categories.length * 2);
+        const input = sectionInput(
+          [ids.sectionA, ids.sectionB],
+          'Synthetic NPTEL section activity',
+        );
+        input.category = 'nptel';
+        const created = await api(
+          categoryCreator,
+          '/api/activities/sections',
+          input,
+          201,
+        );
+        assert.equal(created.assignedCount, 4);
+        assert.equal(
+          (
+            await db.query(
+              'select category_key from public.activities where id=$1',
+              [created.id],
+            )
+          ).rows[0].category_key,
+          'nptel',
+        );
+      },
+    );
+    await check(
+      'real Edge browser publishes one Both activity, persists student completion, and shows creator/counselor results',
+      async () => {
+        const browser = await chromium.launch({
+          channel: 'msedge',
+          headless: true,
+        });
+        const title = `Browser both-section activity ${tag}`;
+        async function browserLogin(context, person) {
+          const page = await context.newPage();
+          await page.goto(`${config.appOrigin}/login`);
+          await page.getByLabel('Email').fill(person.email);
+          await page.getByLabel('Password').fill(person.password);
+          await page
+            .getByRole('button', { name: 'Sign in to local Supabase' })
+            .click();
+          await expect(page).toHaveURL(`${config.appOrigin}/profile`);
+          return page;
+        }
+        try {
+          const anonymous = await browser.newContext();
+          const anonymousPage = await anonymous.newPage();
+          await anonymousPage.goto(`${config.appOrigin}/dashboard/student`);
+          await expect(anonymousPage).toHaveURL(`${config.appOrigin}/login`);
+          await anonymous.close();
+
+          const facultyContext = await browser.newContext({
+            viewport: { width: 1280, height: 820 },
+          });
+          const facultyPage = await browserLogin(facultyContext, placement);
+          await facultyPage.goto(`${config.appOrigin}/dashboard/faculty`);
+          await expect(
+            facultyPage.getByRole('heading', { name: 'Create one activity' }),
+          ).toBeVisible();
+          await expect(facultyPage.getByText('2 eligible now')).toHaveCount(2);
+          await facultyPage
+            .getByRole('checkbox', { name: /Section A/ })
+            .focus();
+          await facultyPage.keyboard.press('Space');
+          await expect(
+            facultyPage.getByRole('checkbox', { name: /Section A/ }),
+          ).toBeChecked();
+          await facultyPage
+            .getByRole('checkbox', { name: /Section B/ })
+            .check();
+          await facultyPage.getByRole('textbox', { name: 'Title' }).fill(title);
+          await facultyPage
+            .getByRole('textbox', { name: 'Description' })
+            .fill('Real browser test instructions');
+          const dates = await facultyPage.evaluate(() => {
+            const local = (delta) => {
+              const date = new Date(Date.now() + delta);
+              return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+                .toISOString()
+                .slice(0, 16);
+            };
+            return {
+              start: local(-120000),
+              deadline: local(3600000),
+              end: local(7200000),
+            };
+          });
+          await facultyPage.locator('input[name="startsAt"]').fill(dates.start);
+          await facultyPage
+            .locator('input[name="deadlineAt"]')
+            .fill(dates.deadline);
+          await facultyPage.locator('input[name="endsAt"]').fill(dates.end);
+          await facultyPage
+            .getByRole('checkbox', {
+              name: /Require authorized staff verification/,
+            })
+            .check();
+          const capability = await db.query(
+            `select c.responsibility_id from public.activity_capabilities c
+             join public.responsibility_assignments r on r.id=c.responsibility_id
+             where r.user_id=$1 and c.category_key='general' and c.can_create`,
+            [placement.id],
+          );
+          assert.equal(capability.rows.length, 1);
+          await db.query(
+            "delete from public.activity_capabilities where responsibility_id=$1 and category_key='general'",
+            [capability.rows[0].responsibility_id],
+          );
+          try {
+            await facultyPage
+              .getByRole('button', { name: 'Publish to selected sections' })
+              .click();
+            await expect(facultyPage.locator('.dashboard-alert')).toContainText(
+              'not permitted',
+            );
+            await expect(
+              facultyPage.getByRole('textbox', { name: 'Title' }),
+            ).toHaveValue(title);
+            assert.equal(
+              (
+                await db.query(
+                  'select count(*)::int n from public.activities where created_by=$1 and title=$2',
+                  [placement.id, title],
+                )
+              ).rows[0].n,
+              0,
+            );
+          } finally {
+            await db.query(
+              `insert into public.activity_capabilities(responsibility_id,category_key,can_create,can_verify)
+               values($1,'general',true,false)
+               on conflict(responsibility_id,category_key) do update set can_create=true`,
+              [capability.rows[0].responsibility_id],
+            );
+          }
+          await facultyPage
+            .getByRole('button', { name: 'Refresh options' })
+            .click();
+          await expect(
+            facultyPage.getByRole('button', {
+              name: 'Publish to selected sections',
+            }),
+          ).toBeEnabled();
+          await facultyPage
+            .locator('form.dashboard-form button[type="submit"]')
+            .evaluate((button) => {
+              button.click();
+              button.click();
+            });
+          await expect(facultyPage.locator('.dashboard-notice')).toContainText(
+            'Saved one activity with 4 assigned students',
+          );
+          const createdRows = await db.query(
+            'select id from public.activities where created_by=$1 and title=$2',
+            [placement.id, title],
+          );
+          assert.equal(
+            createdRows.rows.length,
+            1,
+            'double click must publish only once',
+          );
+          const browserActivityId = createdRows.rows[0].id;
+          assert.equal(
+            (
+              await db.query(
+                'select count(*)::int n from public.activity_assignments where activity_id=$1',
+                [browserActivityId],
+              )
+            ).rows[0].n,
+            4,
+          );
+          await facultyPage
+            .getByRole('link', { name: 'Open completion results' })
+            .click();
+          await expect(
+            facultyPage.getByRole('heading', { name: title }),
+          ).toBeVisible();
+          await expect(
+            facultyPage.getByLabel('Completion totals'),
+          ).toContainText('4');
+          assert.equal(
+            await facultyPage.getByRole('button', { name: /Verify/ }).count(),
+            0,
+          );
+
+          const studentContext = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+            hasTouch: true,
+          });
+          const studentPage = await browserLogin(
+            studentContext,
+            studentList[0],
+          );
+          await studentPage.goto(`${config.appOrigin}/dashboard/student`);
+          const studentCard = studentPage
+            .locator('.dashboard-card')
+            .filter({ hasText: title });
+          await expect(studentCard).toBeVisible();
+          assert.equal(
+            await studentPage.evaluate(
+              () => document.documentElement.scrollWidth <= window.innerWidth,
+            ),
+            true,
+            'mobile page must not overflow horizontally',
+          );
+          const studentAssignment = await db.query(
+            'select id from public.activity_assignments where activity_id=$1 and student_id=$2',
+            [browserActivityId, studentList[0].id],
+          );
+          assert.equal(studentAssignment.rows.length, 1);
+          await studentCard
+            .getByRole('button', { name: 'Report completion' })
+            .evaluate((button) => {
+              button.click();
+              button.click();
+            });
+          await expect(studentPage.getByRole('status')).toContainText(
+            'Saved status reloaded',
+          );
+          assert.equal(
+            (
+              await db.query(
+                'select count(*)::int n from public.activity_completions where assignment_id=$1',
+                [studentAssignment.rows[0].id],
+              )
+            ).rows[0].n,
+            1,
+          );
+          await studentPage.reload();
+          await expect(
+            studentPage.locator('.dashboard-card').filter({ hasText: title }),
+          ).toContainText('Awaiting verification');
+          await studentPage
+            .locator('.dashboard-card')
+            .filter({ hasText: title })
+            .getByRole('button', { name: 'View my history' })
+            .click();
+          await expect(
+            studentPage
+              .locator('.dashboard-card')
+              .filter({ hasText: title })
+              .getByRole('region', { name: `History for ${title}` }),
+          ).toContainText('reported');
+
+          await facultyPage
+            .getByRole('button', { name: 'Refresh results' })
+            .click();
+          await expect(
+            facultyPage.getByLabel('Completion totals'),
+          ).toContainText('Awaiting verification');
+          await expect(
+            facultyPage
+              .locator('.dashboard-list-row')
+              .filter({ hasText: '1042' }),
+          ).toContainText('Awaiting verification');
+
+          const counselorContext = await browser.newContext({
+            viewport: { width: 1280, height: 820 },
+          });
+          const counselorPage = await browserLogin(
+            counselorContext,
+            counselorA,
+          );
+          await counselorPage.goto(`${config.appOrigin}/dashboard/counselor`);
+          await expect(
+            counselorPage.getByRole('heading', {
+              name: 'My counseling students',
+            }),
+          ).toBeVisible();
+          await expect(
+            counselorPage.locator('.dashboard-roster li'),
+          ).toHaveCount(3);
+          await expect(
+            counselorPage
+              .locator('.dashboard-list-row')
+              .filter({ hasText: title })
+              .filter({ hasText: '1042' }),
+          ).toContainText('Awaiting verification');
+          await expect(
+            counselorPage.getByRole('link', { name: 'Faculty activities' }),
+          ).toBeVisible();
+
+          const studentBContext = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            isMobile: true,
+          });
+          await browserLogin(studentBContext, studentList[1]);
+          const otherView = await studentBContext.request.get(
+            `${config.appOrigin}/api/activities/${browserActivityId}`,
+          );
+          assert.equal(otherView.status(), 200);
+          const otherBody = await otherView.json();
+          assert.deepEqual(
+            otherBody.activity.assignments.map((row) => row.student_id),
+            [studentList[1].id],
+          );
+          const forbidden = await studentBContext.request.post(
+            `${config.appOrigin}/api/activity-assignments/${studentAssignment.rows[0].id}/submit`,
+            {
+              headers: {
+                Origin: config.appOrigin,
+                'Content-Type': 'application/json',
+              },
+              data: {},
+            },
+          );
+          assert.equal(forbidden.status(), 403);
+        } finally {
+          await browser.close();
+        }
       },
     );
 

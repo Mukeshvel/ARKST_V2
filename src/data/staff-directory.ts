@@ -62,15 +62,22 @@ export async function updateStaffDirectory(
   return loadStaffDirectory(client);
 }
 
-export async function listCounselorStudents(client: SupabaseClient) {
-  const rows = unwrap(
-    await client
-      .from('counselor_student_mappings')
-      .select(
-        'id,starts_at,ends_at,student:department_student_roster(id,external_student_id,display_name,section_scope_id,active)',
-      )
-      .lte('starts_at', new Date().toISOString())
-      .order('starts_at', { ascending: false }),
-  );
-  return { students: rows };
+export async function listCounselorStudents(
+  client: SupabaseClient,
+  offset = 0,
+) {
+  const response = await client
+    .from('counselor_student_mappings')
+    .select(
+      'id,starts_at,ends_at,student:department_student_roster(id,external_student_id,display_name,section_scope_id,active)',
+      { count: 'exact' },
+    )
+    .lte('starts_at', new Date().toISOString())
+    .order('starts_at', { ascending: false })
+    .order('id')
+    .range(offset, offset + 49);
+  const rows = unwrap(response);
+  if (response.count === null)
+    throw new DirectoryError(503, 'Counselor student count is unavailable.');
+  return { students: rows, total: response.count, offset, pageSize: 50 };
 }

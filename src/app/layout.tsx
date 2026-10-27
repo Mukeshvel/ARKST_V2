@@ -5,9 +5,9 @@ import './globals.css';
 const config = parseEnvironment(process.env);
 export const metadata: Metadata = {
   metadataBase: new URL(config.appOrigin),
-  title: 'ARKST | Foundation',
+  title: 'ARKST | Academic activities',
   description:
-    'Academic operations application — identity foundation, no academic workflows.',
+    'Academic Activity assignment, completion and counselor monitoring.',
 };
 
 export default function RootLayout({

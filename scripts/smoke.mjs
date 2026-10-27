@@ -6,14 +6,22 @@ const response = await fetch(origin);
 assert.equal(response.status, 200);
 assert.match(response.headers.get('content-type') ?? '', /text\/html/);
 const html = await response.text();
-assert.match(html, /Milestone 3A/);
-assert.match(html, /not a functioning academic dashboard/);
-assert.match(html, /No live academic data/);
+assert.match(html, /Academic Activity workspace/);
+assert.match(html, /No private records are shown on this public page/);
+assert.match(html, /Open dashboard/);
 assert.doesNotMatch(html, /<button|<form|<input/);
 const missing = await fetch(new URL('/api/students', origin));
 assert.equal(missing.status, 404);
+const protectedDashboard = await fetch(new URL('/dashboard/student', origin), {
+  redirect: 'manual',
+});
+assert.equal(protectedDashboard.status, 307);
+assert.equal(
+  new URL(protectedDashboard.headers.get('location'), origin).pathname,
+  '/login',
+);
 console.log(
-  'PASS: foundation HTML, honest status, no operational controls, absent student API',
+  'PASS: public HTML, honest dashboard route, no private controls, absent student API',
 );
 const identity = await fetch(new URL('/api/me', origin));
 assert.ok(

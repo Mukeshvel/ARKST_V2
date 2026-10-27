@@ -7,19 +7,27 @@ import { privateHeaders, requireSameOrigin } from './http';
 import { publicIdentityError } from './errors';
 import { ActivityError } from '@/core/activity-input';
 
+type VerifiedIdentity = Awaited<ReturnType<typeof requireOwnIdentity>>;
+
 export async function activityRequest(
   request: Request,
   mutation: boolean,
-  action: (client: SupabaseClient) => Promise<unknown>,
+  action: (
+    client: SupabaseClient,
+    identity: VerifiedIdentity,
+  ) => Promise<unknown>,
   status = 200,
 ) {
   try {
     if (mutation) requireSameOrigin(request, identityConfig().appOrigin);
-    await requireOwnIdentity(true);
-    return NextResponse.json(await action(await createIdentityClient(true)), {
-      status,
-      headers: privateHeaders,
-    });
+    const identity = await requireOwnIdentity(true);
+    return NextResponse.json(
+      await action(await createIdentityClient(true), identity),
+      {
+        status,
+        headers: privateHeaders,
+      },
+    );
   } catch (error) {
     const failure =
       error instanceof ActivityError ? error : publicIdentityError(error);

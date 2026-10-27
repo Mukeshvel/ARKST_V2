@@ -31,6 +31,9 @@ export default async function ProfilePage() {
       <Link href="/">ARKST foundation</Link>
       <h1>Your profile</h1>
       <p>Verified identity · database-backed profile</p>
+      <p>
+        <Link href="/dashboard">Open my dashboard</Link>
+      </p>
       <dl>
         <dt>Name</dt>
         <dd>{profile.display_name}</dd>

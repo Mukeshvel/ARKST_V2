@@ -1,4 +1,4 @@
-# Project status — through Milestone 3B-2A, 2026-10-27
+# Project status — through Milestone 3B-2B, 2026-10-27
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -97,7 +97,8 @@ named placement test activities after the final suite.
 ## Milestone 3B-2A section assignment and monitoring — 2026-10-27
 
 Started from clean approved commit `497a97d` on `main` and created the local
-`codex/milestone-3b-2a` branch. There is no commit or push. Forward-only migration
+`codex/milestone-3b-2a` branch. At that verification point no commit or push was made;
+the local `20d0d3c` checkpoint was created later before 3B-2B. Forward-only migration
 `20261027000600_section_activity_monitoring.sql` was applied to the existing local
 Supabase database with `npx supabase migration up --local`; no reset or remote access.
 
@@ -146,9 +147,78 @@ added test fixture; it was fixed before the successful focused run. The forced h
 failure deliberately logged PostgreSQL `P0001`, returned 503, and left no partial
 Activity. No health checks were bypassed.
 
-Limits: this is a backend API without teacher/student dashboards, production roster,
+At 3B-2A this was a backend API without teacher/student dashboards, production roster,
 hosted OAuth or deployment verification. Section selection is a publication-time
 snapshot; later roster changes do not automatically add/remove existing assignments.
 The 50-row monitor pages use numeric offsets capped at 10,000; large historical data
 and concurrent writes may require cursor pagination later. Group targeting, automatic
 recurrence, cancellation, notifications, follow-up and catch-up remain unimplemented.
+
+## Milestone 3B-2B operational dashboards — 2026-10-27
+
+The approved 3B-2A checkpoint is local commit `20d0d3c` (parent `497a97d`), containing
+the 14 reviewed milestone files. It was confirmed as a clean worktree before 3B-2B.
+This milestone is uncommitted on `codex/milestone-3b-2b`. No push, deployment, remote
+database connection, reset or real roster import occurred.
+
+Protected student, faculty and counselor dashboards now consume real session-backed
+APIs. Students see only RLS-visible assignments, windows, deadline/status and own
+history; reporting calls the existing completion RPC and reloads the saved Activity.
+Faculty publish one section Activity and inspect their own results. The form loads
+current approved category/section combinations and eligible roster counts from the
+read-only `activity_creation_options` RPC added in forward migration
+`20261027000700_activity_creation_options.sql`; publication rechecks all permissions
+and targets in the existing `create_section_activity` RPC. A failed save retains the
+form values. The own-created list and lightweight summary use RLS-filtered reads.
+The result screen is read only and never implies CREATE grants VERIFY. Counselors
+see only current trusted mappings and shared completion rows, including work from
+other creators. The mapped-student endpoint now pages at 50 rows.
+
+`@playwright/test` 1.64.1 is pinned as a development dependency. The test launches
+the already installed Microsoft Edge in headless mode; it does not download a browser.
+The real browser signs in as synthetic local Auth users, publishes to both sections,
+checks one Activity despite a double click, reports one completion despite a double
+click, reloads the student page, and compares creator/counselor results to the same
+database records. It also checks a rejected save with retained values, mobile width,
+keyboard checkbox interaction, anonymous redirect, another student's data isolation,
+and a zero-eligible-roster form state. Existing profile self-service remains available.
+
+| Executed command                                                                                  | Actual result                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --local` | PASS: applied only `00700` to the existing local DB without reset.                                                                                       |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`                  | PASS: 3 pgTAP files, 163 assertions, including the new function's authenticated grant, anonymous denial and fixed-path SECURITY DEFINER checks.          |
+| `npm run check` (approved local process access)                                                   | PASS after final UI edit: format, typecheck, lint, 95 Vitest tests, 10 helper tests and production build.                                                |
+| `npm run build` (approved local process access)                                                   | PASS after final UI edit; all dashboard and API routes compiled.                                                                                         |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                         | PASS: health-gated smoke, 12 identity, 16 Activity and 20 directory groups including the real Edge workflow; synthetic fixture cleanup reported success. |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- directory`            | PASS after adding the empty-roster browser assertion: smoke plus 20 directory groups; cleanup reported success.                                          |
+
+The first focused run stopped at the existing smoke assertion for the old public copy;
+the assertion was updated to require the new honest page and an anonymous dashboard
+redirect. Early browser runs exposed ambiguous Playwright alert/status selectors, which
+were narrowed, and a genuine form bug: refreshing authorized options unmounted the
+form and erased input after a failed save. The form now stays mounted during refresh,
+and the browser's retained-value test passes. Initial Edge launch inside the filesystem
+sandbox failed; the same installed browser launched with approved local process access.
+The local npm install similarly needed approved network access. Forced database-failure
+tests still log expected `P0001`/`58000` codes and verify visible 503/rollback.
+
+A final UI audit found that failed list reads could also display an inaccurate empty
+state. Student, faculty and counselor views now show the read error without claiming
+that the roster or assignments are empty. A sandboxed `npm run check` passed
+formatting, types, lint and unit tests, but its build stage failed with Windows
+`EPERM` creating a generated `.next` prerender directory. `npm run build` and a
+complete `npm run check` then passed with approved local process access. A sandboxed
+SQL run could not reach
+the local PostgreSQL port; the existing containers were healthy, and the approved
+local run passed all 163 assertions. The full local integration suite passed again
+after the UI edit.
+
+Limits: no actual 124-student roster or production staff accounts are present. Aggregate
+eligible counts are a current estimate and may change before publication; the saved
+assignment count comes from the committed transaction. The UI filters the currently
+loaded 50-row page, not all historical pages. Offset pagination is capped at 10,000
+in monitoring APIs. There is no reviewer Verify button or full reviewer dashboard;
+verification remains the existing authorized API operation. Group targeting,
+notifications, recurrence, catch-up, hosted OAuth and production load/concurrency
+behavior remain outside this milestone. This local verification is not a production
+readiness claim.

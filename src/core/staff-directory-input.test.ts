@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { staffDirectoryInput } from './staff-directory-input';
+import { directoryOffset, staffDirectoryInput } from './staff-directory-input';
 
 const valid = {
   teachingStatus: 'non_teaching',
@@ -29,5 +29,24 @@ describe('staff directory input', () => {
     { sectionIds: [valid.sectionIds[0], valid.sectionIds[0]] },
   ])('rejects invalid or privileged data: %j', (change) => {
     expect(() => staffDirectoryInput({ ...valid, ...change })).toThrow();
+  });
+});
+
+describe('counselor page offset', () => {
+  it('accepts the bounded default and a later page', () => {
+    expect(directoryOffset('http://localhost/api/counselor/students')).toBe(0);
+    expect(
+      directoryOffset('http://localhost/api/counselor/students?offset=50'),
+    ).toBe(50);
+  });
+  it.each([
+    'offset=-1',
+    'offset=10001',
+    'offset=1&offset=2',
+    'studentId=other',
+  ])('rejects unsupported query %s', (query) => {
+    expect(() =>
+      directoryOffset(`http://localhost/api/counselor/students?${query}`),
+    ).toThrow();
   });
 });

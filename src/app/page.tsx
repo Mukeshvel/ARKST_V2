@@ -5,7 +5,7 @@ export default function Home() {
     <main>
       <header>
         <span className="brand">ARKST</span>
-        <span className="badge">Milestone 3A · Activity API</span>
+        <span className="badge">Academic Activity workspace</span>
       </header>
       <section aria-labelledby="intro">
         <p className="eyebrow">Academic operations</p>
@@ -14,9 +14,9 @@ export default function Home() {
           <br />A clearer path ahead.
         </h1>
         <p className="intro">
-          The foundation for student academic activities, monitoring, follow-up
-          and catch-up. This is a development foundation, not a functioning
-          academic dashboard.
+          Student assignments, staff publication and counselor monitoring use
+          the same protected Activity records. Sign in with an approved account
+          to view the data available to you.
         </p>
       </section>
       <section className="grid" aria-label="Implementation status">
@@ -29,27 +29,28 @@ export default function Home() {
           </p>
         </article>
         <article>
-          <p className="eyebrow">Local configuration required</p>
+          <p className="eyebrow">Protected</p>
           <h2>Identity &amp; storage</h2>
           <p>
-            Identity and Activity APIs have passed isolated local database
-            tests. A configured local Supabase stack is required to use them. No
-            live academic data is displayed here.
+            Identity and Activity views require a provisioned account and a
+            configured Supabase environment. This public page shows no private
+            academic data.
           </p>
-          <Link href="/login">Local identity sign-in</Link>
+          <Link href="/login">Sign in</Link>
         </article>
         <article>
-          <p className="eyebrow">API implemented</p>
-          <h2>Direct activities</h2>
+          <p className="eyebrow">Operational views</p>
+          <h2>Assigned activities</h2>
           <p>
-            Authorized direct assignment, completion reporting and staff
-            verification persist in PostgreSQL. Dashboards, group targeting and
-            announcements remain future work.
+            Students can report assigned work. Approved staff can publish to
+            sections and monitor results. Counselors see only mapped students.
           </p>
+          <Link href="/dashboard">Open dashboard</Link>
         </article>
       </section>
       <footer>
-        No live academic data. This page is a development status page.
+        No private records are shown on this public page. Group targeting,
+        notifications and catch-up remain future work.
       </footer>
     </main>
   );

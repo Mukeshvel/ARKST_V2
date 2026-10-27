@@ -167,6 +167,11 @@ without making counselor access an Activity CREATE, general READ or VERIFY grant
 Reassignment and revocation remove the old counselor's ordinary current view; historical
 mapping, Activity and completion records remain stored.
 
+Milestone 3B-2B pages `GET /api/counselor/students?offset=0` at 50 rows and returns
+an RLS-filtered total. The counselor dashboard displays that trusted current mapping
+list alongside the paginated shared Activity status view. Staff profile fields and
+navigation links do not change either authorization rule.
+
 ## Verification and limits
 
 Real local integration tests preview/apply roster and counselor CSVs, validate rollback

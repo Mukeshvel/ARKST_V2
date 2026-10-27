@@ -57,6 +57,39 @@ export async function listActivities(client: SupabaseClient, offset: number) {
   return { activities, offset, pageSize: 50 };
 }
 
+const summarySelection =
+  'id,title,description,category_key,scope_id,starts_at,deadline_at,ends_at,requires_verification,created_at,created_by';
+
+export async function listCreatedActivities(
+  client: SupabaseClient,
+  creatorId: string,
+  offset: number,
+) {
+  const response = await client
+    .from('activities')
+    .select(summarySelection, { count: 'exact' })
+    .eq('created_by', creatorId)
+    .order('created_at', { ascending: false })
+    .order('id')
+    .range(offset, offset + 49);
+  const activities = result(response);
+  if (response.count === null)
+    throw new ActivityError(503, 'Activity count is unavailable.');
+  return { activities, total: response.count, offset, pageSize: 50 };
+}
+
+export async function getActivitySummary(client: SupabaseClient, id: string) {
+  const activity = result(
+    await client
+      .from('activities')
+      .select(summarySelection)
+      .eq('id', id)
+      .maybeSingle(),
+  );
+  if (!activity) throw new ActivityError(404, 'Activity is unavailable.');
+  return { activity };
+}
+
 export async function getActivity(client: SupabaseClient, id: string) {
   const activity = result(
     await client
@@ -138,6 +171,13 @@ export async function monitorCounselorActivities(
   return result(
     await client.rpc('monitor_counselor_activities', { p_offset: offset }),
   );
+}
+
+export async function activityCreationOptions(client: SupabaseClient) {
+  const options = result(await client.rpc('activity_creation_options'));
+  if (!Array.isArray(options))
+    throw new ActivityError(503, 'Activity creation options are unavailable.');
+  return { options };
 }
 
 export async function changeCompletion(
