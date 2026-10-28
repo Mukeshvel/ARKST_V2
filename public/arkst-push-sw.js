@@ -26,7 +26,7 @@ self.addEventListener('push', (event) => {
       }
       if (
         typeof preview.url !== 'string' ||
-        !/^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36})$/i.test(
+        !/^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36}|notifications|attention)$/i.test(
           preview.url,
         )
       )
@@ -53,7 +53,7 @@ self.addEventListener('notificationclick', (event) => {
       const path = event.notification.data?.url;
       if (
         typeof path !== 'string' ||
-        !/^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36})$/i.test(
+        !/^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36}|notifications|attention)$/i.test(
           path,
         )
       )

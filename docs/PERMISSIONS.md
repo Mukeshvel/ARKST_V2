@@ -1,5 +1,20 @@
 # Permissions
 
+## Completion Sprint Session 1 workflow boundaries
+
+Follow-up authority requires a current mapped counselor relationship or the
+Activity creator's continuing category CREATE authority for the student's current
+section and original target. It does not confer verification or unrelated roster
+reads. Attention uses the same scoped assignments. A student can escalate only their
+own pending assignment to a current counselor. Staff escalation uses a trusted
+per-section `escalation_routes` row tied to an active matching responsibility;
+designation text and profile preferences are ignored. Old recipients lose ordinary
+case access when their mapping or route ceases to be current. Catch-up review and
+publication require explicit `general` CREATE approval for the active student's
+current section. A current counselor may see the student's request without gaining
+publication authority. Direct writes to workflow tables and route configuration are
+revoked from ordinary clients. See [WORKFLOWS.md](WORKFLOWS.md).
+
 ## Milestone 2 enforcement implemented in code and SQL
 
 Identity rules below were verified locally in Milestone 2.1 and regressed in 3A.

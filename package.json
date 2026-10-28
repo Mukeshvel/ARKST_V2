@@ -22,6 +22,7 @@
     "test:directory": "node scripts/test-local-directory.mjs",
     "test:operations": "node scripts/test-local-operations.mjs",
     "test:push": "node scripts/test-local-push.mjs",
+    "test:workflows": "node scripts/test-local-workflows.mjs",
     "push:generate-local-keys": "node scripts/generate-local-vapid.mjs",
     "push:dispatch:local": "node scripts/dispatch-local-push.mjs",
     "push:watch:local": "node scripts/dispatch-local-push.mjs --watch",

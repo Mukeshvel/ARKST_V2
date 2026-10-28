@@ -10,7 +10,7 @@ export async function GET(
     const id = activityId((await context.params).id);
     const { data, error } = await client
       .from('notifications')
-      .select('source_kind,source_id')
+      .select('source_kind,source_id,target_path')
       .eq('id', id)
       .maybeSingle();
     if (error) throw new ActivityError(503, 'Notification lookup failed.');
@@ -19,12 +19,21 @@ export async function GET(
       title:
         data.source_kind === 'activity'
           ? 'New ARKST Activity'
-          : 'New ARKST announcement',
+          : data.source_kind === 'announcement'
+            ? 'New ARKST announcement'
+            : 'New ARKST update',
       message: 'Open ARKST to view your update.',
       url:
-        data.source_kind === 'activity'
-          ? `/dashboard/student?activity=${data.source_id}`
-          : `/dashboard/announcements/${data.source_id}`,
+        data.target_path &&
+        /^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36}|notifications|attention)$/i.test(
+          data.target_path,
+        )
+          ? data.target_path
+          : data.source_kind === 'activity'
+            ? `/dashboard/student?activity=${data.source_id}`
+            : data.source_kind === 'announcement'
+              ? `/dashboard/announcements/${data.source_id}`
+              : '/dashboard/notifications',
     };
   });
 }

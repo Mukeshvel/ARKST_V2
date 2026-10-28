@@ -35,6 +35,10 @@ export function DashboardNav({
             )}
           </>
         )}
+        <Link href="/dashboard/catch-up">Catch-up</Link>
+        <Link href="/dashboard/attention">
+          {accountKind === 'staff' ? 'Attention' : 'Escalations'}
+        </Link>
         <InboxLink />
         <Link href="/profile">Profile</Link>
         <form action="/auth/logout" method="post">

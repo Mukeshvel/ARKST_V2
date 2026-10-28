@@ -37,7 +37,7 @@ worker re-fetches a generic, privacy-preserving preview through the current
 session and recipient RLS before showing a popup. A logged-out or switched
 account cannot display the former account's private content. A failed preview
 fetch means no popup; the inbox remains available when ARKST reconnects. Click
-destinations are fixed same-origin Activity/announcement paths, with their
+destinations are fixed same-origin Activity, announcement, inbox or attention paths, with their
 normal server authorization. The service worker does not cache application
 data or intercept normal requests. An in-flight provider attempt may finish
 after a user disables the endpoint; future claims exclude inactive devices.

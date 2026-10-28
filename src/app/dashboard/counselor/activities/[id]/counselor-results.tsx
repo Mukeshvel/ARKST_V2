@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { dashboardJson, formatWhen } from '../../../dashboard-data';
 import { CompletionProgress } from '../../../completion-progress';
 import { PendingCopyButton } from '../../../pending-copy-button';
+import { FollowUpPanel } from '../../../follow-up-panel';
+import { EscalationAction } from '../../../escalation-action';
 
 type Row = {
   assignmentId: string;
@@ -95,9 +97,7 @@ export function CounselorResults({ activityId }: { activityId: string }) {
       {detail && (
         <>
           <div className="dashboard-intro">
-            <p className="dashboard-eyebrow">
-              Current mapped students · Read only
-            </p>
+            <p className="dashboard-eyebrow">Current mapped students</p>
             <h1>{detail.title}</h1>
             <p>Completion reports from the existing shared Activity records.</p>
           </div>
@@ -193,6 +193,15 @@ export function CounselorResults({ activityId }: { activityId: string }) {
                           ` · Verified ${formatWhen(row.verifiedAt)}`}
                       </p>
                     )}
+                    {row.state === null && (
+                      <details>
+                        <summary>Escalate this pending Activity</summary>
+                        <EscalationAction
+                          assignmentId={row.assignmentId}
+                          label="Send to configured coordinator"
+                        />
+                      </details>
+                    )}
                   </div>
                   <span
                     className={`dashboard-state dashboard-state-${state(row)}`}
@@ -207,6 +216,15 @@ export function CounselorResults({ activityId }: { activityId: string }) {
               No students on this page match that filter.
             </p>
           )}
+          <FollowUpPanel
+            targets={detail.assignments.map((row) => ({
+              assignmentId: row.assignmentId,
+              studentName: row.studentName,
+              studentIdentifier: row.studentIdentifier,
+              deadlineAt: row.deadlineAt,
+              pending: row.state === null,
+            }))}
+          />
           <div className="dashboard-actions dashboard-pagination">
             <button
               type="button"

@@ -18,6 +18,116 @@ export function activityId(value: unknown): string {
   return value.toLowerCase();
 }
 
+export function followUpInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a follow-up object.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) => !['assignmentIds', 'reason'].includes(key),
+    ) ||
+    !Array.isArray(data.assignmentIds) ||
+    data.assignmentIds.length < 1 ||
+    data.assignmentIds.length > 100 ||
+    typeof data.reason !== 'string' ||
+    data.reason.trim().length < 1 ||
+    data.reason.trim().length > 500
+  )
+    throw new ActivityError(400, 'Invalid follow-up request.');
+  const assignmentIds = data.assignmentIds.map(activityId);
+  if (new Set(assignmentIds).size !== assignmentIds.length)
+    throw new ActivityError(400, 'Duplicate assignments are not accepted.');
+  return { p_assignments: assignmentIds, p_reason: data.reason.trim() };
+}
+
+export function followUpSelection(url: string) {
+  const query = new URL(url).searchParams;
+  if (
+    [...query.keys()].some((key) => key !== 'assignment') ||
+    query.getAll('assignment').length > 50
+  )
+    throw new ActivityError(400, 'Invalid assignment selection.');
+  return [...new Set(query.getAll('assignment').map(activityId))];
+}
+
+export function followUpResolutionInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a resolution object.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some((key) => key !== 'note') ||
+    typeof data.note !== 'string' ||
+    data.note.trim().length < 1 ||
+    data.note.trim().length > 500
+  )
+    throw new ActivityError(400, 'A resolution note is required.');
+  return { p_note: data.note.trim() };
+}
+
+export function catchUpRequestInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a catch-up request object.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) => !['subject', 'missedInformation'].includes(key),
+    ) ||
+    typeof data.subject !== 'string' ||
+    data.subject.trim().length < 1 ||
+    data.subject.trim().length > 160 ||
+    typeof data.missedInformation !== 'string' ||
+    data.missedInformation.trim().length < 1 ||
+    data.missedInformation.trim().length > 3000
+  )
+    throw new ActivityError(400, 'Invalid catch-up request.');
+  return {
+    p_subject: data.subject.trim(),
+    p_information: data.missedInformation.trim(),
+  };
+}
+
+export function catchUpReviewInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a review decision.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some((key) => !['approve', 'reason'].includes(key)) ||
+    typeof data.approve !== 'boolean' ||
+    (data.approve && data.reason !== undefined) ||
+    (!data.approve &&
+      (typeof data.reason !== 'string' ||
+        data.reason.trim().length < 1 ||
+        data.reason.trim().length > 500))
+  )
+    throw new ActivityError(
+      400,
+      'Rejection requires a reason; approval does not.',
+    );
+  return {
+    p_approve: data.approve,
+    p_reason: data.approve ? null : (data.reason as string).trim(),
+  };
+}
+
+export function escalationInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected an escalation request.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) => !['assignmentId', 'reason'].includes(key),
+    ) ||
+    typeof data.reason !== 'string' ||
+    data.reason.trim().length < 1 ||
+    data.reason.trim().length > 500
+  )
+    throw new ActivityError(400, 'An escalation reason is required.');
+  return {
+    p_assignment: activityId(data.assignmentId),
+    p_reason: data.reason.trim(),
+  };
+}
+
 function instant(value: unknown): string {
   // Explicit UTC only; round-trip validation rejects impossible calendar dates.
   if (

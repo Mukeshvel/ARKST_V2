@@ -1,5 +1,12 @@
 # Architecture
 
+Completion Sprint Session 1 adds follow-up, attention, escalation and catch-up
+workflows on the same Activity assignments, trusted directory, announcements and
+notification inbox/outbox. The new `/dashboard/attention` and
+`/dashboard/catch-up` pages use authenticated API routes and fixed-path PostgreSQL
+RPCs; no separate Activity or completion model was introduced. See
+[WORKFLOWS.md](WORKFLOWS.md) for data flow, authorization and local evidence.
+
 One modular Next.js 16 App Router application with strict TypeScript and React.
 Initial scale: approximately 130 students and 50 staff; no microservices or monorepo.
 

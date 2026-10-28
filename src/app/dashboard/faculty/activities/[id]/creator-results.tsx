@@ -9,6 +9,7 @@ import type {
 import { dashboardJson, formatWhen } from '../../../dashboard-data';
 import { CompletionProgress } from '../../../completion-progress';
 import { PendingCopyButton } from '../../../pending-copy-button';
+import { FollowUpPanel } from '../../../follow-up-panel';
 
 type ResultFilter =
   'all' | 'pending' | 'overdue' | 'reported' | 'awaiting' | 'verified';
@@ -112,7 +113,7 @@ export function CreatorResults({ activityId }: { activityId: string }) {
               {activity.requires_verification
                 ? 'Student reports require separate authorized verification.'
                 : 'Student reports count as complete without verification.'}{' '}
-              Results are read only in this view.
+              Review pending students and record follow-ups below.
             </p>
           </div>
           <div className="dashboard-metrics" aria-label="Completion totals">
@@ -225,6 +226,16 @@ export function CreatorResults({ activityId }: { activityId: string }) {
               No assignments on this page match that filter.
             </p>
           )}
+          <FollowUpPanel
+            targets={monitor.assignments.map((row) => ({
+              assignmentId: row.assignmentId,
+              studentName: row.studentName ?? 'Roster name unavailable',
+              studentIdentifier:
+                row.studentIdentifier ?? 'Identifier unavailable',
+              deadlineAt: activity.deadline_at,
+              pending: row.state === null,
+            }))}
+          />
           <div className="dashboard-actions dashboard-pagination">
             <button
               className="dashboard-secondary"

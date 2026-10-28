@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { EscalationAction } from '../escalation-action';
 import type { Activity, Assignment, HistoryEvent } from '../dashboard-data';
 import {
   activityState,
@@ -121,6 +122,19 @@ function StudentActivity({
               : 'View my history'}
         </button>
       </div>
+      {!assignment.completion && (
+        <details>
+          <summary>Need counselor attention?</summary>
+          <p className="dashboard-muted">
+            Send this pending Activity to your currently assigned counselor. A
+            missing mapping or duplicate request is rejected.
+          </p>
+          <EscalationAction
+            assignmentId={assignment.id}
+            label="Send to counselor"
+          />
+        </details>
+      )}
       {historyError && <p role="alert">{historyError}</p>}
       {historyOpen && (
         <section

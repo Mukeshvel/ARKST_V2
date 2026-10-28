@@ -81,4 +81,17 @@ test('notification click rejects untrusted paths before opening a window', async
   });
   await click('https://evil.example/');
   await click('/dashboard/student?activity=not-a-uuid');
+  await click('/dashboard/attention?student=someone');
+});
+
+test('workflow notification click opens the authorized attention page', async () => {
+  const calls = [];
+  const click = clickHarness({
+    openWindow: async (url) => {
+      calls.push(url);
+      return { focus: async () => calls.push('focused') };
+    },
+  });
+  await click('/dashboard/attention');
+  assert.deepEqual(calls, [`${origin}/dashboard/attention`, 'focused']);
 });

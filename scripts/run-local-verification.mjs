@@ -21,9 +21,15 @@ async function main() {
   );
   const suite = process.argv[2] ?? 'all';
   assert.ok(
-    ['all', 'identity', 'activity', 'directory', 'operations', 'push'].includes(
-      suite,
-    ),
+    [
+      'all',
+      'identity',
+      'activity',
+      'directory',
+      'operations',
+      'push',
+      'workflows',
+    ].includes(suite),
   );
   const { stdout } = await execute(
     process.execPath,
@@ -135,6 +141,8 @@ async function main() {
       await run('scripts/test-local-operations.mjs');
     if (suite === 'all' || suite === 'push')
       await run('scripts/test-local-push.mjs');
+    if (suite === 'all' || suite === 'workflows')
+      await run('scripts/test-local-workflows.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');

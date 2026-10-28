@@ -1,5 +1,12 @@
 # Activity engine — Milestones 3A and 3B-2A
 
+Completion Sprint Session 1 attaches follow-up, attention and escalation records to
+the existing assignment UUID. It does not create a second completion source or change
+the report/verify transition. A student report atomically resolves an open follow-up
+and escalation; a staff closure never marks the Activity complete. Missed-information
+requests publish through the existing announcement workflow only after authorized
+review. See [WORKFLOWS.md](WORKFLOWS.md) for the current API and scope rules.
+
 The shared PostgreSQL model supports assignment, weekly_test, nptel, seminar,
 mini_project, placement and general. A trusted operator can add category rows without
 new workflow tables or code branches; each category still needs explicit staff approval.

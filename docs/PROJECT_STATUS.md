@@ -1,4 +1,4 @@
-# Project status — through Milestone 5.1, 2026-10-28
+# Project status — through Completion Sprint Session 1, 2026-10-28
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -452,3 +452,86 @@ delivery and a hosted trusted scheduler remain unverified; local browser
 success is not a production-readiness claim. The synthetic fixture and
 Git-ignored local credentials remain available for any explicitly requested
 follow-up verification; they were not silently deleted.
+
+## Completion Sprint Session 1 — follow-up, attention, escalation and catch-up, 2026-10-28
+
+Started from clean `612cec9` on `main`. All Milestones 1–5 code and the earlier
+manually verified Windows Web Push outcome were preserved. Only the isolated local
+Supabase database was migrated, in forward order without reset, through
+`20261028001100_missed_information_attention.sql`. No actual department roster,
+real account, remote database, branch, commit, push or deployment was used.
+
+The existing Activity assignments/completions now have scoped follow-up records,
+actor/time history, a 24-hour repeat limit, batch atomicity and inbox/outbox notices.
+An authenticated student report resolves an open follow-up in the same transaction;
+staff may close one with a note without changing completion. Counselor and creator
+result pages expose pending selection and recorded history while retaining charts and
+Copy Pending Students. The Attention page explains overdue, near-deadline, multiple
+outstanding, unresolved follow-up and visible missed-information conditions using
+current authorized assignments. Missed-information requests also appear in a scoped
+list when the student has no pending Activity. A student can escalate their pending Activity to a
+current mapped counselor; the counselor can advance to a trusted configured
+coordinator; that coordinator can advance to a configured branch coordinator or HOD.
+Current responsibility/mapping/route, one-open-case and repeat limits are checked in
+PostgreSQL. The catch-up page lets a student request missing information, an approved
+`general` creator review or reject it with a reason, then publish staff-written
+official information to selected permitted recipients through the existing
+announcement and notification transaction. See [WORKFLOWS.md](WORKFLOWS.md) for
+the exact rules, endpoints and trusted route configuration.
+
+| Command                                                                                                  | Actual result                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npx supabase migration list --local`; `npx supabase migration up --local`                               | Initial history matched through `00400`; seven new forward-only migrations `00500`–`01100` applied locally. No reset.                                                                        |
+| `npm run check`                                                                                          | PASS: formatting, typecheck, lint, 107 Vitest tests, 14 Node helper/worker tests and production build.                                                                                       |
+| `npm run test:rls`                                                                                       | PASS: 6 pgTAP files, 312 assertions including all prior security checks and new RLS/definer/route guards.                                                                                    |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                                | PASS: smoke plus 82 real Auth/HTTP/PostgreSQL groups: identity 12, Activity 16, directory 20, operations 9, push foundation 13, Session 1 workflows 12. Synthetic fixtures reported removed. |
+| Headless Edge in the workflow suite                                                                      | PASS: staff approved and published a real catch-up request in the browser; counselor result page displayed the recorded follow-up and student-report resolution.                             |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; node scripts/run-local-verification.mjs workflows` | PASS after the combined run: 13 Session 1 groups, including the configured branch-coordinator route as well as HOD fallback. Synthetic fixtures reported removed.                            |
+
+Session 1 integration tested a teacher's NPTEL assignment, mapped counselor
+follow-up, recipient inbox/preview, student completion and recorded resolution;
+creator follow-up without a counselor mapping; catch-up approval, rejection,
+separate publication and restricted audience; student/counselor/coordinator/HOD
+and configured branch-coordinator escalation; unauthorized cross-scope attempts;
+duplicate processing; inactive
+roster and expired mapping denial; 55 real follow-up recipients; and a deliberately
+failed outbox insert that rolled the whole follow-up back with HTTP 503. SQL tests
+assert direct write denial, RLS, fixed-path SECURITY DEFINER functions and route
+relationship constraints. The existing push integration suite uses deterministic
+provider responses and reported a permission-denied headless browser registration;
+it did not repeat the earlier normal-Chrome Windows delivery observation.
+
+Failures observed and corrected during this session: the first local CLI lookup
+could not write telemetry under the sandbox and succeeded with authorized local
+Docker access; the first authenticated follow-up read returned 403 because an RLS
+policy predicate lacked caller EXECUTE, corrected by migration `00900` with only
+three boolean policy helpers granted; one test expected 403 after completion where
+the established conflict response is 409; a browser test selector matched both a
+status and a history row and was narrowed; a sandboxed Next prerender hit EPERM
+writing `.next`, and the same build passed with local workspace write access.
+No health, authorization or test assertion was bypassed.
+
+Remaining limits: the initial official roster and approved route/counselor records
+are not imported; route changes need a trusted operator and review of open cases;
+catch-up does not reopen expired Activity windows; hosted push still requires a
+trusted scheduler and approved secrets; hosted Auth/Google OAuth are untested.
+The current headless run cannot establish new real desktop push delivery, although
+the prior normal-Chrome Windows delivery and click test remains recorded above.
+This is a locally verified Session 1 foundation, not production readiness.
+
+**Session 2 handoff:** keep `main` and the existing shared Activity, assignment,
+notification and directory models. Start by reviewing the seven applied Session 1
+migrations and [WORKFLOWS.md](WORKFLOWS.md), then implement recurrence and dynamic
+groups as the next requested session. Do not seed actual roster, counselor or route
+data without approved records. Re-run `npm run check`, `npm run test:rls` and the
+full local integration runner after subsequent changes.
+
+Final read-only checks: `npx supabase migration list --local` matched every
+repository migration through `01100`; local database, Auth, gateway and Realtime
+containers were healthy. PostgreSQL reported zero remaining
+`arkst-workflow-*` synthetic Auth accounts. `git diff --check` passed. Git remains
+on `main` at `612cec9`, with 17 modified tracked files, 25 untracked Session 1
+files, zero staged files and no commit. Local `.env*`, `.supabase-home`, `.next`
+and `node_modules` remain ignored. A safe checkpoint is a human review of these
+exact source, migration, test and documentation files before any local commit;
+no automatic checkpoint was made.

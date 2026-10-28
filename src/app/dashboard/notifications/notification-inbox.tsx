@@ -6,8 +6,10 @@ import { dashboardJson, formatWhen } from '../dashboard-data';
 
 type Notification = {
   id: string;
-  source_kind: 'activity' | 'announcement';
+  source_kind:
+    'activity' | 'announcement' | 'follow_up' | 'escalation' | 'catch_up';
   source_id: string;
+  target_path: string | null;
   title: string;
   message: string;
   created_at: string;
@@ -123,9 +125,16 @@ export function NotificationInbox() {
         <div className="dashboard-stack">
           {rows.map((row) => {
             const href =
-              row.source_kind === 'activity'
-                ? `/dashboard/student?activity=${row.source_id}`
-                : `/dashboard/announcements/${row.source_id}`;
+              row.target_path &&
+              /^\/dashboard\/(student\?activity=[0-9a-f-]{36}|announcements\/[0-9a-f-]{36}|notifications|attention)$/i.test(
+                row.target_path,
+              )
+                ? row.target_path
+                : row.source_kind === 'activity'
+                  ? `/dashboard/student?activity=${row.source_id}`
+                  : row.source_kind === 'announcement'
+                    ? `/dashboard/announcements/${row.source_id}`
+                    : '/dashboard/notifications';
             return (
               <article className="dashboard-card" key={row.id}>
                 <div className="dashboard-card-head">

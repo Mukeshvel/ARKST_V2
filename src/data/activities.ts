@@ -310,9 +310,12 @@ export async function listNotifications(
 ) {
   const response = await client
     .from('notifications')
-    .select('id,source_kind,source_id,title,message,created_at,read_at', {
-      count: 'exact',
-    })
+    .select(
+      'id,source_kind,source_id,title,message,target_path,created_at,read_at',
+      {
+        count: 'exact',
+      },
+    )
     .order('created_at', { ascending: false })
     .order('id')
     .range(offset, offset + 49);
@@ -333,6 +336,114 @@ export async function listNotifications(
     offset,
     pageSize: 50,
   };
+}
+
+export async function listFollowUps(
+  client: SupabaseClient,
+  assignments: string[],
+) {
+  if (!assignments.length) return { followUps: [], total: 0, truncated: false };
+  const response = await client
+    .from('activity_follow_ups')
+    .select(
+      'id,assignment_id,recipient_id,initiated_by,reason,status,created_at,resolved_at,resolution,resolution_note,activity_follow_up_history(actor_id,action,occurred_at,note)',
+      { count: 'exact' },
+    )
+    .in('assignment_id', assignments)
+    .order('created_at', { ascending: false })
+    .range(0, 499);
+  const followUps = result(response);
+  if (response.count === null)
+    throw new ActivityError(503, 'Follow-up count is unavailable.');
+  return { followUps, total: response.count, truncated: response.count > 500 };
+}
+
+export async function sendFollowUps(
+  client: SupabaseClient,
+  input: { p_assignments: string[]; p_reason: string },
+) {
+  return result(await client.rpc('send_activity_follow_ups', input));
+}
+
+export async function resolveFollowUp(
+  client: SupabaseClient,
+  id: string,
+  note: string,
+) {
+  return result(
+    await client.rpc('resolve_activity_follow_up', {
+      p_follow_up: id,
+      p_note: note,
+    }),
+  );
+}
+
+export async function listCatchUpRequests(
+  client: SupabaseClient,
+  offset: number,
+) {
+  return result(
+    await client.rpc('list_catch_up_requests', { p_offset: offset }),
+  );
+}
+export async function submitCatchUpRequest(
+  client: SupabaseClient,
+  input: { p_subject: string; p_information: string },
+) {
+  return { id: result(await client.rpc('submit_catch_up_request', input)) };
+}
+export async function reviewCatchUpRequest(
+  client: SupabaseClient,
+  id: string,
+  input: { p_approve: boolean; p_reason: string | null },
+) {
+  return result(
+    await client.rpc('review_catch_up_request', { p_request: id, ...input }),
+  );
+}
+export async function publishCatchUpRequest(
+  client: SupabaseClient,
+  id: string,
+  input: ReturnType<typeof announcementInput>,
+) {
+  return result(
+    await client.rpc('publish_catch_up_request', { p_request: id, ...input }),
+  );
+}
+
+export async function attentionNeeded(client: SupabaseClient, offset: number) {
+  return result(await client.rpc('attention_needed', { p_offset: offset }));
+}
+export async function missedInformationAttention(
+  client: SupabaseClient,
+  offset: number,
+) {
+  return result(
+    await client.rpc('missed_information_attention', { p_offset: offset }),
+  );
+}
+export async function listEscalations(client: SupabaseClient, offset: number) {
+  return result(
+    await client.rpc('list_activity_escalations', { p_offset: offset }),
+  );
+}
+export async function escalateActivity(
+  client: SupabaseClient,
+  input: { p_assignment: string; p_reason: string },
+) {
+  return result(await client.rpc('escalate_activity', input));
+}
+export async function resolveEscalation(
+  client: SupabaseClient,
+  id: string,
+  note: string,
+) {
+  return result(
+    await client.rpc('resolve_activity_escalation', {
+      p_escalation: id,
+      p_note: note,
+    }),
+  );
 }
 
 export async function markNotificationRead(client: SupabaseClient, id: string) {
