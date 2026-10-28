@@ -736,6 +736,160 @@ async function main() {
       },
     );
     await check(
+      'selected Activity counselor totals, unmapped work, pagination and permissions',
+      async () => {
+        const counselor = (
+          await sql(
+            "insert into public.responsibility_assignments(user_id,role,scope_id,starts_at) values($1,'counselor',$2,now()-interval '1 day') returning id",
+            [operator.id, ids.department],
+          )
+        )[0].id;
+        await sql(
+          `insert into public.counselor_student_mappings(roster_student_id,counselor_responsibility_id,created_by,starts_at)
+        select id,$1,$2,now()-interval '1 hour' from public.department_student_roster where linked_student_id=$3`,
+          [counselor, operator.id, studentA.id],
+        );
+        const selected = (
+          await sql(
+            `insert into public.activities(category_key,scope_id,title,starts_at,deadline_at,ends_at,requires_verification,created_by)
+        values('nptel',$1,'Selected Activity verification',now()-interval '1 hour',now()+interval '1 day',now()+interval '2 days',true,$2) returning id`,
+            [ids.department, operator.id],
+          )
+        )[0].id;
+        const assignments = await sql(
+          'insert into public.activity_assignments(activity_id,student_id,assigned_by) values($1,$2,$4),($1,$3,$4) returning id,student_id',
+          [selected, studentA.id, studentB.id, operator.id],
+        );
+        noDatabaseError(
+          await studentA.client.rpc('submit_activity', {
+            p_assignment: assignments.find((x) => x.student_id === studentA.id)
+              .id,
+          }),
+          'real selected Activity submission',
+        );
+        const endpoint = `/api/supervision/activities?department=${ids.department}&activity=${selected}`;
+        const result = await api(operator, endpoint);
+        assert.equal(result.summary.assigned, 2);
+        assert.equal(result.summary.reported, 1);
+        assert.equal(result.summary.awaitingVerification, 1);
+        assert.equal(result.summary.verified, 0);
+        assert.equal(result.summary.pending, 1);
+        assert.equal(result.summary.reportedPercent, 50);
+        assert.equal(
+          result.counselors.find((x) => x.counselorId === operator.id).reported,
+          1,
+        );
+        assert.equal(
+          result.counselors.find((x) => x.counselorId === null).pending,
+          1,
+        );
+        assert.equal(
+          result.counselors.reduce((n, x) => n + x.assigned, 0),
+          2,
+        );
+        const laterPage = await api(operator, endpoint + '&offset=50');
+        assert.deepEqual(laterPage.summary, result.summary);
+        assert.deepEqual(laterPage.counselors, result.counselors);
+        assert.equal(laterPage.students.length, 0);
+        assert.equal(
+          (await api(operator, endpoint + `&section=${ids.sectionB}`)).summary
+            .reported,
+          0,
+        );
+        const different = await api(
+          operator,
+          `/api/supervision/activities?department=${ids.department}&activity=${nptel}`,
+        );
+        assert.equal(different.summary.reported, 0);
+        for (const person of [noGrant, studentA])
+          await api(person, endpoint, undefined, 403);
+        await api(
+          operator,
+          endpoint + `&section=${ids.outsideSection}`,
+          undefined,
+          403,
+        );
+        await api(
+          operator,
+          `/api/supervision/activities?department=${ids.outside}`,
+          undefined,
+          403,
+        );
+        await api(operator, endpoint + '&activity=bad', undefined, 400);
+        // A verified completion remains reported but is no longer awaiting verification.
+        await sql(
+          "update public.activity_completions set state='verified',verified_by=$1,verified_at=now() where assignment_id=$2",
+          [
+            operator.id,
+            assignments.find((x) => x.student_id === studentA.id).id,
+          ],
+        );
+        const verified = await api(operator, endpoint);
+        assert.equal(verified.summary.reported, 1);
+        assert.equal(verified.summary.awaitingVerification, 0);
+        assert.equal(verified.summary.verified, 1);
+        // Current membership, not an old assignment or mapping, controls visibility.
+        await sql(
+          'update public.student_scope_memberships set ends_at=now() where student_id=$1 and scope_id=$2',
+          [studentA.id, ids.sectionA],
+        );
+        assert.equal((await api(operator, endpoint)).summary.assigned, 1);
+        await sql(
+          'update public.student_scope_memberships set ends_at=null where student_id=$1 and scope_id=$2',
+          [studentA.id, ids.sectionA],
+        );
+        await sql(
+          'update public.department_student_roster set active=false where linked_student_id=$1',
+          [studentB.id],
+        );
+        assert.equal((await api(operator, endpoint)).summary.assigned, 1);
+        await sql(
+          'update public.department_student_roster set active=true where linked_student_id=$1',
+          [studentB.id],
+        );
+        const secondCounselor = (
+          await sql(
+            "insert into public.responsibility_assignments(user_id,role,scope_id,starts_at) values($1,'counselor',$2,now()-interval '1 day') returning id",
+            [noGrant.id, ids.department],
+          )
+        )[0].id;
+        await sql(
+          `insert into public.counselor_student_mappings(roster_student_id,counselor_responsibility_id,created_by)
+          select id,$1,$2 from public.department_student_roster where linked_student_id=$3`,
+          [secondCounselor, operator.id, studentB.id],
+        );
+        const twoCounselors = await api(operator, endpoint);
+        assert.equal(twoCounselors.counselors.length, 2);
+        assert.equal(
+          twoCounselors.counselors.find((row) => row.counselorId === noGrant.id)
+            .pending,
+          1,
+        );
+        // Close the previous allocation before assigning the same student to the next counselor.
+        await sql(
+          'update public.counselor_student_mappings set ends_at=now() where counselor_responsibility_id=$1',
+          [counselor],
+        );
+        await sql(
+          `insert into public.counselor_student_mappings(roster_student_id,counselor_responsibility_id,created_by)
+          select id,$1,$2 from public.department_student_roster where linked_student_id=$3`,
+          [secondCounselor, operator.id, studentA.id],
+        );
+        const reassigned = await api(operator, endpoint);
+        assert.equal(reassigned.counselors.length, 1);
+        assert.equal(reassigned.counselors[0].counselorId, noGrant.id);
+        assert.equal(reassigned.counselors[0].assigned, 2);
+        await sql(
+          'update public.counselor_student_mappings set ends_at=now() where counselor_responsibility_id=$1',
+          [secondCounselor],
+        );
+        const revoked = await api(operator, endpoint);
+        assert.equal(revoked.counselors.length, 1);
+        assert.equal(revoked.counselors[0].counselorId, null);
+        assert.equal(revoked.counselors[0].assigned, 2);
+      },
+    );
+    await check(
       'supervisor sees only explicit department scope with real drill-down',
       async () => {
         const overview = await api(
@@ -774,6 +928,19 @@ async function main() {
         assert.deepEqual(afterForeign.summary, overview.summary);
         assert.deepEqual(afterForeign.sections, overview.sections);
         assert.deepEqual(afterForeign.students, overview.students);
+        await api(
+          operator,
+          `/api/supervision/activities?department=${ids.department}&activity=${foreignActivity}`,
+          undefined,
+          403,
+        );
+        const activityOptions = await api(
+          operator,
+          `/api/supervision/activities?department=${ids.department}`,
+        );
+        assert.ok(
+          !activityOptions.activities.some((row) => row.id === foreignActivity),
+        );
         const afterForeignDetail = await api(
           operator,
           `/api/supervision/students/${studentA.id}?department=${ids.department}`,
@@ -1000,6 +1167,18 @@ async function main() {
           ).toBeVisible();
           await expect(page.getByText('Student A-17')).toBeVisible();
           await page
+            .getByRole('combobox', { name: 'Activity', exact: true })
+            .selectOption({ label: 'Selected Activity verification' });
+          await expect(
+            page.getByRole('cell', { name: '50%', exact: true }),
+          ).toHaveCount(2);
+          await expect(
+            page.getByRole('rowheader', {
+              name: 'Department total',
+              exact: true,
+            }),
+          ).toBeVisible();
+          await page
             .getByRole('combobox', { name: 'Section' })
             .selectOption(ids.sectionA);
           await expect(
@@ -1116,6 +1295,10 @@ async function main() {
         await sql(
           "delete from public.scopes where kind='group' and parent_id=$1",
           [ids.department],
+        );
+        await sql(
+          'delete from public.counselor_student_mappings where roster_student_id in (select id from public.department_student_roster where department_scope_id=any($1::uuid[]))',
+          [[ids.department, ids.outside]],
         );
         await sql(
           'delete from public.department_student_roster where department_scope_id=any($1::uuid[])',

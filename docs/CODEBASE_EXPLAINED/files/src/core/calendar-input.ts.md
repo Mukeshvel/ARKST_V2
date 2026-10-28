@@ -29,3 +29,7 @@ Run `npm run check`, then `npm run test:local -- session2` against the existing 
 ## G. Important cautions
 
 Timezones, blackout overlap and idempotence matter. Existing published Activities must not be silently rewritten; the hosted timer is not running merely because a unit file exists.
+
+## Selected-Activity supervision update
+
+`supervisionActivityQuery` removes and validates one optional Activity UUID, then reuses `supervisionQuery` for department, section and offset. The original all-activities input contract is unchanged.

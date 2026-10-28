@@ -162,6 +162,16 @@ export function departmentQuery(url: string) {
     throw new ActivityError(400, 'Expected one department.');
   return activityId(q.get('department'));
 }
+export function supervisionActivityQuery(url: string) {
+  const parsed = new URL(url);
+  const ids = parsed.searchParams.getAll('activity');
+  if (ids.length > 1) throw new ActivityError(400, 'Invalid Activity filter.');
+  parsed.searchParams.delete('activity');
+  return {
+    ...supervisionQuery(parsed.toString()),
+    p_activity: ids.length ? activityId(ids[0]) : null,
+  };
+}
 export function supervisionQuery(url: string) {
   const q = new URL(url).searchParams;
   if (

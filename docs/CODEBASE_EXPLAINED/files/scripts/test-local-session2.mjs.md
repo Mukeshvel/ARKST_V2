@@ -30,3 +30,7 @@ Run `npm run test:local -- session2` through the existing local wrapper with the
 ## G. Important cautions
 
 Do not weaken assertions to make a regression pass. Local synthetic accounts and controlled provider responses are not proof of hosted or desktop delivery.
+
+## Selected-Activity supervision update
+
+The selected-Activity group reuses the existing synthetic users and adds two assignments plus trusted counselor allocations. It covers unmapped rows, multiple counselors, reassignment, verification states, full totals beyond the student page, current membership and inactive-roster exclusion, unauthorized callers and foreign Activity rejection. Edge selects the Activity and checks the table; existing all-activities tests remain intact.

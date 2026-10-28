@@ -3,6 +3,14 @@ create extension if not exists pgtap with schema extensions;
 set local search_path=public,extensions;
 select no_plan();
 
+select ok(not has_function_privilege('anon','public.supervisory_activity_overview(uuid,uuid,uuid,integer)','EXECUTE'),
+  'selected Activity supervision denies anonymous execution');
+select ok(has_function_privilege('authenticated','public.supervisory_activity_overview(uuid,uuid,uuid,integer)','EXECUTE'),
+  'selected Activity supervision is available to authenticated callers with internal capability checks');
+select ok((select prosecdef and 'search_path=""'=any(proconfig) from pg_proc
+  where oid='public.supervisory_activity_overview(uuid,uuid,uuid,integer)'::regprocedure),
+  'selected Activity supervision is fixed-path SECURITY DEFINER');
+
 select ok((select relrowsecurity from pg_class where oid=('public.'||name)::regclass),
   name||' enforces RLS') from unnest(array[
   'department_operation_capabilities','academic_groups','group_membership_history',

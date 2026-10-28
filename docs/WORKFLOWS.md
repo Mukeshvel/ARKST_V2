@@ -276,3 +276,15 @@ supervision; historical rows remain stored. Activities originally targeted in a
 different department are excluded even if the student later transfers into this
 roster. Completion bars include submitted work awaiting verification; the numeric
 states remain distinct.
+
+### One Activity by counselor
+
+In Supervisory overview, choose an Activity in “Selected Activity: counselor results”.
+The same explicit department supervision grant authorizes the new read-only report.
+All sections gives department totals; a section filter narrows them. Current trusted
+counselor mappings group active assigned students, with unmapped students separate.
+Reported includes all submissions; awaiting verification and verified are subsets.
+Pending includes overdue unreported assignments. Totals cover the full authorized
+set, while expandable student results page at 50. Transfers, inactive students and
+expired mappings cannot retain current access solely through old records. The
+existing all-activities overview and student work view are unchanged.

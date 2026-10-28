@@ -255,3 +255,12 @@ Every maintained file from the tracked/unignored repository inventory is listed 
 | Ignored `.env.local`, `.env.push.local`, `.env.scheduler.local`, other credential files | EXCLUDED             | Private local configuration; values were not read or reproduced.                      |
 | Local Supabase and Docker state                                                         | EXCLUDED             | Generated runtime data, not checked-in source.                                        |
 | New `docs/CODEBASE_EXPLAINED/` pages                                                    | EXCLUDED FROM MIRROR | These are the new guide itself; see the learning-guide navigation in `FILE_INDEX.md`. |
+
+## Selected-Activity supervision addition
+
+| File                                                                                                                                  | Status     | Reason                           |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------- |
+| [`supabase/migrations/20261028002500_activity_supervision.sql`](files/supabase/migrations/20261028002500_activity_supervision.sql.md) | DOCUMENTED | Mirrored A–G explanation exists. |
+| [`src/app/api/supervision/activities/route.ts`](files/src/app/api/supervision/activities/route.ts.md)                                 | DOCUMENTED | Mirrored A–G explanation exists. |
+| [`src/app/dashboard/supervision/activity-supervision.tsx`](files/src/app/dashboard/supervision/activity-supervision.tsx.md)           | DOCUMENTED | Mirrored A–G explanation exists. |
+| [`src/core/calendar-input.test.ts`](files/src/core/calendar-input.test.ts.md)                                                         | DOCUMENTED | Mirrored A–G explanation exists. |

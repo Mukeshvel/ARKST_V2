@@ -1,11 +1,12 @@
-# ARKST V2 — Go account handoff (2026-10-28)
+# ARKST V2 — Go account handoff (updated 2026-10-28)
 
 Read this with `PROJECT_STATUS.md`, `WORKFLOWS.md`, `PERMISSIONS.md` and
-`RELEASE_OPERATIONS.md`. This document records the repository's Session 3 state;
-it does not certify a deployed product. The latest **committed** checkpoint at
-Session 3 start was `454c439` on `main` (Session 2). Session 3 work is uncommitted;
-confirm `git status --short --branch` before making any change. No branch, commit,
-push, remote Supabase change or database reset was made in this session.
+`RELEASE_OPERATIONS.md`. This document records the repository's release-preflight
+state; it does not certify a deployed product. At this review's start `main` was
+clean at **committed `97a545d`** (`docs: Add human-readable ARKST codebase guide`).
+Session 3 is already included in earlier committed history. Confirm
+`git status --short --branch` before any future change. This preflight changes
+documentation only; it does not connect to remote Supabase, deploy or reset data.
 
 ## VISION
 
@@ -66,8 +67,9 @@ tests or an explicit trusted operator process, never the web app.
 
 ## NEXT
 
-1. Review uncommitted Session 3 diff and final verification evidence. Make a human
-   approved local checkpoint; do not silently merge unrelated work.
+1. Review the committed `main` checkpoint and the preflight checklist in
+   `RELEASE_OPERATIONS.md`. The Session 3 and codebase-guide work is already
+   committed; do not reconstruct it or create a new feature branch for staging.
 2. Obtain institutional approval and the official roster with unique student
    identifiers, names, sections and verified email addresses; approved staff list,
    counselor mapping, role/capability grants, exact schedule hours, blackout dates,
@@ -92,6 +94,9 @@ tests or an explicit trusted operator process, never the web app.
   The included timers are examples and have not run in hosting.
 - Production data protection: a hosted backup/restore exercise, monitoring, TLS,
   migration rehearsal and privacy review are outstanding.
+- Selected-Activity counselor reporting is now implemented and locally verified.
+  Staging must apply forward migration `20261028002500_activity_supervision.sql`
+  and verify the approved HOD supervision grant; hosted acceptance remains pending.
 
 ## FUTURE
 

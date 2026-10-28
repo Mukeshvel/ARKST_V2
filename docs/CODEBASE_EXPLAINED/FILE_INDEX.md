@@ -263,3 +263,14 @@ This is a read-only inventory of the **242 maintained files at Git checkpoint `0
 ## Explicit exclusions
 
 Ignored local credential and environment files, `node_modules/`, `.next/`, `.git/`, local Supabase/Docker state and caches are generated or private and are not maintained project source. No maintained binary asset is present in this inventory; `public/arkst-push-sw.js` is JavaScript and has a full explanation. `package-lock.json` has a short dependency-lock explanation. This guide folder is new documentation and is indexed by its own guide navigation rather than recursively mirroring itself.
+
+## Selected-Activity supervision addition
+
+The original 242-file checkpoint inventory is retained above. These four maintained files bring the inventory to 246.
+
+| Relative path                                                                                                                      | Responsibility                                                        | Used by                | Explanation                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| [`supabase/migrations/20261028002500_activity_supervision.sql`](../../supabase/migrations/20261028002500_activity_supervision.sql) | Adds a read-only, selected-Activity supervisory RPC.                  | Department supervision | [Explanation](files/supabase/migrations/20261028002500_activity_supervision.sql.md) |
+| [`src/app/api/supervision/activities/route.ts`](../../src/app/api/supervision/activities/route.ts)                                 | Authenticated GET endpoint for Activity choices and selected results. | Department supervision | [Explanation](files/src/app/api/supervision/activities/route.ts.md)                 |
+| [`src/app/dashboard/supervision/activity-supervision.tsx`](../../src/app/dashboard/supervision/activity-supervision.tsx)           | Small client component for selected-Activity counselor reporting.     | Department supervision | [Explanation](files/src/app/dashboard/supervision/activity-supervision.tsx.md)      |
+| [`src/core/calendar-input.test.ts`](../../src/core/calendar-input.test.ts)                                                         | Unit tests for Activity supervision query parsing.                    | Department supervision | [Explanation](files/src/core/calendar-input.test.ts.md)                             |

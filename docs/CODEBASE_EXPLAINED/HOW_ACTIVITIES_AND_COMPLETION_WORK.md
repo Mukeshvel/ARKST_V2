@@ -40,14 +40,17 @@ currently allocated to that counselor. [Creator monitoring](../../src/app/dashbo
 and [supervision](../../src/app/dashboard/supervision/supervision-board.tsx) read the
 same assignments and completion records through different permission rules.
 
-## One important reporting limit
+## Selected-Activity counselor reporting
 
-The department supervision page has section and current-counselor aggregates over
-the granted department's Activities. Its API takes department/section filters,
-not an Activity ID. It therefore does **not** currently provide counselor-wise
-counts for one chosen NPTEL Activity. A creator and each counselor can inspect that
-Activity under their own narrower views. Do not interpret the all-Activity HOD
-ratio as the NPTEL-specific ratio.
+The supervision page retains its all-activities overview and adds an Activity selector.
+Choosing NPTEL Week 4 calls `/api/supervision/activities` with its ID. The
+`supervisory_activity_overview` RPC checks the exact-department supervision grant,
+Activity origin, current active roster and section membership before counting.
+Current trusted counselor mappings group the assignments; unmapped students get a
+separate row. The total is computed before paging student detail. Reported includes
+all submissions, not just verified work. Awaiting verification and verified are
+separate subsets; pending includes overdue work. Section filters narrow the total.
+See [the query explanation](files/supabase/migrations/20261028002500_activity_supervision.sql.md).
 
 ## Tests and safe edits
 

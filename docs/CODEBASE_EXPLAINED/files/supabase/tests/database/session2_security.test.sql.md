@@ -30,3 +30,7 @@ In the isolated local stack, confirm migration history, then run `npm run test:r
 ## G. Important cautions
 
 Do not weaken assertions to make a regression pass. Local synthetic accounts and controlled provider responses are not proof of hosted or desktop delivery.
+
+## Selected-Activity supervision update
+
+Three additional assertions protect the selected-Activity RPC: anonymous execution denied, authenticated execution available with internal authorization, and fixed-path SECURITY DEFINER. The original 33-function assertions remain unchanged.

@@ -12,7 +12,7 @@ It supports department and counselor progress over existing assignments. An expl
 
 ## C. How does it work?
 
-It renders the labels, forms, lists or progress shown to a signed-in user and calls the named API paths or imported helpers in this file. Named declarations include `Department`, `Summary`, `Section`, `Counselor`, `Student`, `Overview` and others. API paths named here: `/api/department-operations`. The page shows granted department totals, section and current-counselor ratios, and paged student detail. It has no Activity-ID filter for counselor-wise counts; those aggregates span the authorized department's Activities.
+It renders the labels, forms, lists or progress shown to a signed-in user and calls the named API paths or imported helpers in this file. Named declarations include `Department`, `Summary`, `Section`, `Counselor`, `Student`, `Overview` and others. API paths named here: `/api/department-operations`. The page shows granted department totals, section and current-counselor ratios, and paged student detail. It also mounts `src/app/dashboard/supervision/activity-supervision.tsx` alongside that unchanged all-activities report. The new component provides a separate selected-Activity counselor table.
 
 ## D. Which files does it connect to?
 

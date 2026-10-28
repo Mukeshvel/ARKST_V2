@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { dashboardJson } from '../dashboard-data';
+import { ActivitySupervision } from './activity-supervision';
 
 type Department = {
   departmentId: string;
@@ -222,6 +223,11 @@ export function SupervisionBoard() {
       </section>
       {overview && (
         <>
+          <ActivitySupervision
+            key={`${department}:${section}`}
+            department={department}
+            section={section}
+          />
           <section className="dashboard-panel dashboard-stack">
             <h2>Department progress</h2>
             <p>

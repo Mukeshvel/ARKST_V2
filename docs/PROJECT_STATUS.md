@@ -706,3 +706,58 @@ app. Production OAuth, data import, HTTPS hosting, monitored schedulers, backup/
 restore, device and staff acceptance are pending. The code is a candidate for a
 controlled staging deployment attempt after review, **not a deployed or approved
 college product**. See `GO_ACCOUNT_HANDOFF.md` and `RELEASE_OPERATIONS.md`.
+
+## Focused correction: selected-Activity counselor results (2026-10-28)
+
+Implemented alongside the existing all-activities supervisor view, without replacing
+its RPC, endpoint, aggregates or student work detail. An explicitly granted HOD or
+coordinator can select one Activity, see current counselor and unmapped totals,
+and expand paged student results. Department/section filtering, active roster and
+membership checks, current trusted counselor mappings and Activity department-origin
+checks preserve transfer privacy. Reported means any submitted completion; awaiting
+verification and verified are separate subsets. Pending includes overdue unreported
+work. Totals use all authorized assignments, independently of the 50-student page.
+There is no hardcoded counselor count and no new authorization grant.
+
+Changes: one forward-only migration `20261028002500_activity_supervision.sql`, one
+read-only `/api/supervision/activities` endpoint, a small separate UI component,
+query validation, focused tests and affected learning/release documentation.
+The 37 prior migrations were already applied; only migration 02500 was applied to
+the existing local database. No reset, remote operation, branch, commit or push.
+Existing uncommitted release-readiness documentation was retained.
+
+Verification executed:
+
+- `node node_modules/supabase/dist/supabase.js migration list --local`: verified
+  the original 37 applied migrations before applying the one pending migration.
+- `node node_modules/supabase/dist/supabase.js migration up --local`: applied only
+  `20261028002500_activity_supervision.sql`.
+- `npm run test:rls`: all 459 assertions in seven SQL suites passed, including
+  the new RPC privilege/search-path checks and unchanged earlier security checks.
+- `npm run check`: formatting, type checks, lint, 112 Vitest tests and 20 Node tests
+  passed. Its build initially failed on a sandbox Windows EPERM generated-directory
+  write. `npm run build` rerun outside that restriction passed.
+- With PowerShell `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'`,
+  `node scripts/run-local-verification.mjs session2`: all 14 real local groups
+  passed, including Edge Activity selection/table rendering and original supervisor
+  reporting. Coverage includes multiple counselors, unmapped work, distinct Activities,
+  expired/reassigned mappings, inactive roster/membership, foreign Activity exclusion,
+  section filtering, unauthorized callers and full totals on an empty later page.
+- With the same local guards, `node scripts/run-local-verification.mjs activity`:
+  all 16 existing real Auth/HTTP/PostgreSQL/RLS groups passed. Expected injected
+  database failures returned 503 and rolled back; failure hooks and synthetic
+  fixtures were removed by the suite.
+
+The first integration startup failed because the build was incomplete. The first
+completed test run then caught an incorrect new test assumption: an existing group
+Activity already had a completion. The distinct-Activity assertion was corrected to
+use the existing unsubmitted NPTEL fixture; no old test or permission check was
+weakened. Subsequent runs passed.
+
+Limits: this is current active-student/current-counselor reporting, not historical
+counselor-at-publication attribution. A section selection intentionally narrows the
+scope total; choose all sections for the department total. Hosted migration and
+real institutional acceptance remain unverified. Other milestone integration suites
+were not rerun for this read-only reporting addition; the complete SQL security suite
+and unit checks were rerun. No OAuth, scheduler, notification, authentication,
+completion mutation or RLS policy implementation was changed.
