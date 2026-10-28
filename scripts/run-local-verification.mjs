@@ -29,6 +29,7 @@ async function main() {
       'operations',
       'push',
       'workflows',
+      'session2',
     ].includes(suite),
   );
   const { stdout } = await execute(
@@ -143,6 +144,8 @@ async function main() {
       await run('scripts/test-local-push.mjs');
     if (suite === 'all' || suite === 'workflows')
       await run('scripts/test-local-workflows.mjs');
+    if (suite === 'all' || suite === 'session2')
+      await run('scripts/test-local-session2.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');

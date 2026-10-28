@@ -305,6 +305,42 @@ dd {
   opacity: 0.58;
   cursor: not-allowed;
 }
+.supervision-ratio {
+  min-width: 110px;
+  position: relative;
+  height: 22px;
+  border-radius: 8px;
+  background: #e3ece5;
+  overflow: hidden;
+}
+.supervision-ratio > span {
+  display: block;
+  height: 100%;
+  background: #2d8a5b;
+}
+.supervision-ratio > small {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  line-height: 22px;
+  color: #123525;
+  font-weight: 700;
+}
+.supervision-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+.supervision-metrics > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #d7e1da;
+  border-radius: 8px;
+}
+.supervision-metrics strong {
+  font-size: 1.5rem;
+}
 .dashboard-secondary,
 .dashboard-filter-active {
   border: 1px solid #a8bdb0;

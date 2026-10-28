@@ -128,6 +128,139 @@ export function escalationInput(value: unknown) {
   };
 }
 
+export function groupDetailsInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected group details.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) => !['departmentId', 'name', 'type'].includes(key),
+    ) ||
+    typeof data.name !== 'string' ||
+    data.name.trim().length < 1 ||
+    data.name.trim().length > 120 ||
+    typeof data.type !== 'string' ||
+    data.type.trim().length < 1 ||
+    data.type.trim().length > 80
+  )
+    throw new ActivityError(400, 'Invalid group details.');
+  return {
+    p_department: activityId(data.departmentId),
+    p_name: data.name.trim(),
+    p_type: data.type.trim(),
+  };
+}
+
+export function groupMemberInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a group membership change.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some((key) => !['studentId', 'add'].includes(key)) ||
+    typeof data.add !== 'boolean'
+  )
+    throw new ActivityError(400, 'Invalid group membership change.');
+  return { p_student: activityId(data.studentId), p_add: data.add };
+}
+
+export function groupEditInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected a group edit.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) => !['name', 'type', 'active'].includes(key),
+    ) ||
+    typeof data.name !== 'string' ||
+    !data.name.trim() ||
+    data.name.trim().length > 120 ||
+    typeof data.type !== 'string' ||
+    !data.type.trim() ||
+    data.type.trim().length > 80 ||
+    typeof data.active !== 'boolean'
+  )
+    throw new ActivityError(400, 'Invalid group edit.');
+  return {
+    p_name: data.name.trim(),
+    p_type: data.type.trim(),
+    p_active: data.active,
+  };
+}
+
+export function groupStudentQuery(url: string) {
+  const q = new URL(url).searchParams;
+  if (
+    [...q.keys()].some((key) => !['search', 'offset'].includes(key)) ||
+    [...q.keys()].some((key) => q.getAll(key).length > 1)
+  )
+    throw new ActivityError(400, 'Invalid group roster query.');
+  const search = q.get('search') ?? '';
+  const offset = q.get('offset') ?? '0';
+  if (search.length > 80 || !/^\d{1,5}$/.test(offset) || Number(offset) > 10000)
+    throw new ActivityError(400, 'Invalid group roster query.');
+  return { p_search: search, p_offset: Number(offset) };
+}
+
+export function groupActivityInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected group Activity fields.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some(
+      (key) =>
+        ![
+          'category',
+          'title',
+          'description',
+          'startsAt',
+          'deadlineAt',
+          'endsAt',
+          'requiresVerification',
+        ].includes(key),
+    ) ||
+    typeof data.category !== 'string' ||
+    !/^[a-z][a-z0-9_]{0,49}$/.test(data.category) ||
+    typeof data.title !== 'string' ||
+    data.title.trim().length < 1 ||
+    data.title.trim().length > 160 ||
+    typeof data.description !== 'string' ||
+    data.description.length > 5000 ||
+    typeof data.requiresVerification !== 'boolean'
+  )
+    throw new ActivityError(400, 'Invalid group Activity fields.');
+  const starts = instant(data.startsAt),
+    deadline = instant(data.deadlineAt),
+    ends = instant(data.endsAt);
+  if (!(starts < deadline && deadline <= ends))
+    throw new ActivityError(400, 'Invalid Activity window.');
+  return {
+    p_category: data.category,
+    p_title: data.title.trim(),
+    p_description: data.description,
+    p_starts_at: starts,
+    p_deadline_at: deadline,
+    p_ends_at: ends,
+    p_requires_verification: data.requiresVerification,
+  };
+}
+
+export function groupAnnouncementInput(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new ActivityError(400, 'Expected group announcement fields.');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).some((key) => !['title', 'message'].includes(key)) ||
+    typeof data.title !== 'string' ||
+    data.title.trim().length < 1 ||
+    data.title.trim().length > 160 ||
+    typeof data.message !== 'string' ||
+    data.message.trim().length < 1 ||
+    data.message.trim().length > 5000
+  )
+    throw new ActivityError(400, 'Invalid group announcement fields.');
+  return { p_title: data.title.trim(), p_message: data.message.trim() };
+}
+
 function instant(value: unknown): string {
   // Explicit UTC only; round-trip validation rejects impossible calendar dates.
   if (

@@ -1,4 +1,4 @@
-# Project status — through Completion Sprint Session 1, 2026-10-28
+# Project status — through Completion Sprint Session 2, 2026-10-28
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -535,3 +535,121 @@ files, zero staged files and no commit. Local `.env*`, `.supabase-home`, `.next`
 and `node_modules` remain ignored. A safe checkpoint is a human review of these
 exact source, migration, test and documentation files before any local commit;
 no automatic checkpoint was made.
+
+## Completion Sprint Session 2 — dynamic groups, recurring calendar and overview, 2026-10-28
+
+Started from clean committed Session 1 checkpoint `1b14172` on `main`. The existing
+local Supabase migrations matched through `20261028001100` and the stack was healthy.
+Forward-only migrations `01200`–`02200` were applied to the **existing local** database;
+no reset, hosted connection, real roster import, branch, commit, push or deployment
+occurred. No production group, schedule, blackout or account was seeded.
+
+**Implemented and locally verified.** Explicit trusted operation grants are separate
+from responsibility names, editable staff profiles and category Activity grants.
+`grant-operations` in the existing local admin CLI previews by default and applies
+an exact-department, current-responsibility grant/revocation transaction with actor
+history. Approved group managers can create/edit/disable arbitrary named groups,
+add/remove current members, see current and historical membership, and publish a
+group Activity or announcement. Publication rechecks the existing category CREATE
+scope for _every_ current member, then calls the existing selected-audience publisher;
+the existing assignment and recipient snapshots survive membership changes. An
+inactive member remains visible for authorized removal and blocks publication until
+resolved. Groups do not create a parallel completion database.
+Disabling a group stops additions and publication while allowing authorized removal
+of remaining members; reactivation is explicit.
+
+Calendar managers can configure a named paused schedule, timezone, 1–4 week cycle,
+approved sections and 1–20 editable test windows with explicit local start/end times.
+The UI offers the requested two-week five-test pattern as editable suggestions; it
+does not invent institutional time-of-day values. Overlapping slots are rejected.
+Active department blackouts block new overlapping occurrences and leave published
+Activities untouched. Blocked occurrences have no Activity assignments or outbox
+notices, and requeue requires blackout removal plus an explicit decision. Published
+overlaps appear as conflicts for staff review. Generation locks the schedule and
+department blackout boundary, starts at its anchor Monday, reuses the existing
+weekly-test section publisher, and stores a unique occurrence key for idempotence.
+The authenticated UI button and local CLI runner are operational; **no hosted cron
+or background process was started**. Creator-authorized manual Activity deadline/end
+changes are stored with old/new times and actor audit without rewriting assignments.
+
+An independently granted department supervisor sees active-student, section and
+current-counselor totals plus paginated student drill-down from existing Activity,
+completion, follow-up and escalation rows. CREATE/group/calendar grants alone do not
+grant this private overview. The dashboard distinguishes reported work awaiting
+verification from verified work. A supervisor can inspect paged assignment and open
+case detail for an active student in that department. The assignment's original
+department is checked, so a transferred student's old-department Activity is
+excluded from the new department's overview and detail without deleting history.
+See [WORKFLOWS.md](WORKFLOWS.md),
+[ARCHITECTURE.md](ARCHITECTURE.md) and [PERMISSIONS.md](PERMISSIONS.md).
+
+**Actual verification.** `npx supabase migration list --local` matched through `02200`;
+`npm run test:rls` passed **7 files, 452 assertions**. With `APP_ENV=local` and
+`LOCAL_IDENTITY_TESTS=1`, `npm run test:local` passed smoke plus **96 real local
+Auth/HTTP/PostgreSQL integration groups**: identity 12, Activity 16, directory 20,
+operations 9, push foundation 13, Session 1 workflows 13 and Session 2 groups 13.
+The Session 2 suite used synthetic signed-in accounts, real group/schedule records,
+an actual authenticated local scheduler CLI run and headless Edge page checks; fixture
+cleanup completed. Final `npm run check` passed format, typecheck, lint, 107 Vitest
+tests, 14 Node helper/worker tests and the optimized production build.
+The push suite's headless browser still reports permission denied for desktop push;
+the earlier normal-Chrome Windows delivery/click observation is separate evidence.
+
+**Failed checks corrected without weakening prior tests.** The first Session 2 test
+horizon unintentionally included a second cycle. Narrowing it exposed a real runner
+bug: a future anchor generated pre-anchor occurrences. Forward migration `01600`
+corrected that; the initial focused test then used an invalid visibility assertion
+for text inside a collapsed dropdown and was corrected. A later full regression run
+and isolated directory rerun both received `40P01` during two concurrent counselor
+mapping inserts. Forward migration `01900` serializes mapping statements before the
+existing GiST exclusion check; the unchanged directory test and complete run passed.
+A final code review found inactive group members were hidden from the eligible picker;
+`02000` adds an authorized current-member view so they can be removed. `02100`
+allows removal while a group is disabled and still blocks additions. Both changes
+have real integration checks. The first browser mutation check also found that the
+local runner's default sign-out revoked the staff account's other sessions; it now
+clears only its own client session, and the browser/API check passed. One sandboxed
+production build hit Windows `.next` EPERM;
+the same build passed with workspace write access. No database or health check was
+bypassed.
+The final review also found that earlier supervisor counts could include a
+transferred student's Activity from another department. Forward migration `02200`
+limits every count and assignment detail to the granted department; the focused
+real Auth/API/PostgreSQL/Edge suite and security assertions passed after that fix.
+
+**Implemented but not yet verified in production.** The calendar UI's editable
+five-row suggestion form and every possible date/timezone boundary have not been
+manually exercised by college staff. Headless Edge verified rendering of saved
+groups, calendar and supervisor data; the API and PostgreSQL workflows were tested
+end to end. The local CLI was invoked with a real synthetic authorized staff login,
+but unattended service-host operation has not been set up or observed.
+
+**External/deployment blockers.** Official 124-student roster, approved counselor
+mappings, actual staff grants, test hours, blackout calendar and escalation routes
+have not been supplied; no real records were imported. A production HTTPS host,
+Supabase configuration, secure scheduler credential custody/rotation, monitored cron,
+push dispatcher and hosted delivery verification remain to be established. Google
+OAuth remains unconfigured. These local results are not production readiness.
+
+**Session 3 handoff.** Review and checkpoint the uncommitted Session 2 files after
+human inspection. Obtain approved roster, counselor mapping, named staff, explicit
+category/operation grants and academic calendar times. Configure one paused schedule
+and five slots through the UI, review blackouts/conflicts, then resume only after
+policy approval. Provision a monitored host scheduler and push dispatcher before
+claiming automatic delivery. Perform real staff/student acceptance and hosted
+security/notification checks without weakening the existing local suites.
+
+**Final local checkpoint.** The full `npm run test:local` rerun passed all 96 groups
+after `02200`; `npm run test:rls` passed 452 assertions. Local PostgreSQL remained
+healthy, all 35 local migrations matched its history, and a read-only database
+check found zero Session 2 synthetic Auth users, groups or schedules after cleanup.
+`git diff --check` passed (Git emitted only Windows LF/CRLF conversion warnings).
+`main` remains at `1b14172` with 14 modified tracked files, 45 untracked Session 2
+files, no staged files, and no commit/push/deployment. Git ignores the local env,
+build, package and Supabase home directories. The headless push suite again reported
+browser desktop permission denied; no new Windows Web Push delivery was claimed.
+One direct `npm run test:session2` invocation stopped before creating fixtures because
+`APP_ORIGIN` was absent; the project wrapper supplied isolated local configuration
+and the focused and full suites passed. The first cleanup inspection used a
+nonexistent group-name column; the corrected read-only query confirmed zero
+remaining Session 2 groups.

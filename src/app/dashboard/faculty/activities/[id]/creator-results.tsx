@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type {
   Activity,
   CreatorAssignment,
@@ -23,6 +23,12 @@ function rowState(
     return activity.requires_verification ? 'awaiting' : 'reported';
   return Date.now() >= Date.parse(activity.deadline_at) ? 'overdue' : 'pending';
 }
+function localInput(value: string) {
+  const instant = new Date(value);
+  return new Date(instant.getTime() - instant.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
 
 export function CreatorResults({ activityId }: { activityId: string }) {
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -31,6 +37,38 @@ export function CreatorResults({ activityId }: { activityId: string }) {
   const [filter, setFilter] = useState<ResultFilter>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [windowError, setWindowError] = useState('');
+  const [windowSaving, setWindowSaving] = useState(false);
+  const [windowNotice, setWindowNotice] = useState('');
+
+  async function updateWindow(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (windowSaving) return;
+    setWindowSaving(true);
+    setWindowError('');
+    setWindowNotice('');
+    const form = new FormData(event.currentTarget);
+    try {
+      await dashboardJson(`/api/activities/${activityId}/window`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deadlineAt: new Date(String(form.get('deadlineAt'))).toISOString(),
+          endsAt: new Date(String(form.get('endsAt'))).toISOString(),
+        }),
+      });
+      await load(offset);
+      setWindowNotice(
+        'Updated deadline and window saved. Existing assignments remain unchanged.',
+      );
+    } catch (cause) {
+      setWindowError(
+        cause instanceof Error ? cause.message : 'Window change failed.',
+      );
+    } finally {
+      setWindowSaving(false);
+    }
+  }
 
   const load = useCallback(
     async (nextOffset: number) => {
@@ -148,6 +186,42 @@ export function CreatorResults({ activityId }: { activityId: string }) {
             awaiting={monitor.awaitingVerification}
             verified={monitor.verified}
           />
+          <form
+            className="dashboard-form dashboard-panel"
+            onSubmit={updateWindow}
+            key={`${activity.id}-${activity.deadline_at}-${activity.ends_at}`}
+          >
+            <h2>Change deadline or end time</h2>
+            <p>
+              Only the original creator with current category CREATE scope can
+              change this Activity window. The change is audited.
+            </p>
+            <div className="dashboard-form-grid">
+              <label>
+                Deadline (browser local time){' '}
+                <input
+                  name="deadlineAt"
+                  type="datetime-local"
+                  required
+                  defaultValue={localInput(activity.deadline_at)}
+                />
+              </label>
+              <label>
+                Window ends (browser local time){' '}
+                <input
+                  name="endsAt"
+                  type="datetime-local"
+                  required
+                  defaultValue={localInput(activity.ends_at)}
+                />
+              </label>
+            </div>
+            <button disabled={windowSaving} type="submit">
+              Save window
+            </button>
+            {windowError && <p role="alert">{windowError}</p>}
+            {windowNotice && <p role="status">{windowNotice}</p>}
+          </form>
           <PendingCopyButton activityId={activityId} view="creator" />
           <div className="dashboard-toolbar">
             <p className="dashboard-muted">

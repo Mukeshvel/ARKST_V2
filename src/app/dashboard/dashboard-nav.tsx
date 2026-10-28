@@ -30,6 +30,9 @@ export function DashboardNav({
         ) : (
           <>
             <Link href="/dashboard/faculty">Faculty activities</Link>
+            <Link href="/dashboard/groups">Groups</Link>
+            <Link href="/dashboard/calendar">Calendar</Link>
+            <Link href="/dashboard/supervision">Overview</Link>
             {currentCounselor(responsibilities) && (
               <Link href="/dashboard/counselor">Counselor view</Link>
             )}

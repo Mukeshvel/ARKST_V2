@@ -83,10 +83,11 @@ async function main() {
       'import-counselors',
       'reassign-counselors',
       'revoke-counselors',
+      'grant-operations',
     ].includes(options.command)
   )
     throw new Error(
-      'Use provision-staff, import-roster, import-counselors, reassign-counselors or revoke-counselors.',
+      'Use provision-staff, grant-operations, import-roster, import-counselors, reassign-counselors or revoke-counselors.',
     );
   const connection = process.env.LOCAL_DATABASE_URL;
   if (!connection)
@@ -125,6 +126,126 @@ async function main() {
     );
     if (!dept.rowCount)
       throw new Error('--department must identify a department scope.');
+
+    if (options.command === 'grant-operations') {
+      if (
+        !uuid(options.responsibility) ||
+        !['true', 'false'].includes(options.groups ?? '') ||
+        !['true', 'false'].includes(options.calendar ?? '') ||
+        !['true', 'false'].includes(options.supervise ?? '')
+      )
+        throw new Error(
+          'grant-operations requires a responsibility UUID and explicit --groups, --calendar, --supervise true|false values.',
+        );
+      const target = await db.query(
+        `select r.id from public.responsibility_assignments r
+          join public.profiles p on p.id=r.user_id and p.is_active and p.account_kind='staff'
+          where r.id=$1 and r.scope_id=$2 and r.starts_at<=now()
+            and (r.ends_at is null or now()<r.ends_at)`,
+        [options.responsibility, options.department],
+      );
+      if (!target.rowCount)
+        throw new Error(
+          'Target must be a current approved staff responsibility in this exact department.',
+        );
+      const requested = {
+        groups: options.groups === 'true',
+        calendar: options.calendar === 'true',
+        supervise: options.supervise === 'true',
+      };
+      const existing = await db.query(
+        'select can_manage_groups,can_manage_calendar,can_supervise from public.department_operation_capabilities where responsibility_id=$1',
+        [options.responsibility],
+      );
+      const previous = {
+        groups: existing.rows[0]?.can_manage_groups ?? false,
+        calendar: existing.rows[0]?.can_manage_calendar ?? false,
+        supervise: existing.rows[0]?.can_supervise ?? false,
+      };
+      if (JSON.stringify(previous) === JSON.stringify(requested))
+        throw new Error('Requested operation grants are unchanged.');
+      console.log(
+        `PREVIEW ${JSON.stringify({ department: options.department, responsibility: options.responsibility, previous, requested })}`,
+      );
+      if (!options.apply) {
+        console.log(
+          'PREVIEW ONLY. No records written. Add --apply to commit this validated transaction.',
+        );
+        return;
+      }
+      await db.query('begin');
+      inTransaction = true;
+      const stillAdmin = await db.query(
+        `select 1 from public.profiles p join public.responsibility_assignments r on r.user_id=p.id
+          where p.id=$1 and p.is_active and p.account_kind='staff' and r.role='admin'
+            and r.scope_id=$2 and r.starts_at<=now() and (r.ends_at is null or now()<r.ends_at)
+          for update of r`,
+        [options.operator, options.department],
+      );
+      const lockedTarget = await db.query(
+        `select r.id from public.responsibility_assignments r join public.profiles p on p.id=r.user_id
+          where r.id=$1 and r.scope_id=$2 and p.is_active and p.account_kind='staff'
+            and r.starts_at<=now() and (r.ends_at is null or now()<r.ends_at)
+          for update of r`,
+        [options.responsibility, options.department],
+      );
+      if (!stillAdmin.rowCount || !lockedTarget.rowCount)
+        throw new Error(
+          'Admin or target responsibility changed during approval.',
+        );
+      const locked = await db.query(
+        'select can_manage_groups,can_manage_calendar,can_supervise from public.department_operation_capabilities where responsibility_id=$1',
+        [options.responsibility],
+      );
+      const lockedPrevious = {
+        groups: locked.rows[0]?.can_manage_groups ?? false,
+        calendar: locked.rows[0]?.can_manage_calendar ?? false,
+        supervise: locked.rows[0]?.can_supervise ?? false,
+      };
+      if (JSON.stringify(lockedPrevious) !== JSON.stringify(previous))
+        throw new Error(
+          'Operation grants changed since preview; review again.',
+        );
+      if (requested.groups || requested.calendar || requested.supervise) {
+        await db.query(
+          `insert into public.department_operation_capabilities(responsibility_id,can_manage_groups,can_manage_calendar,can_supervise)
+          values($1,$2,$3,$4) on conflict(responsibility_id) do update set
+          can_manage_groups=excluded.can_manage_groups,can_manage_calendar=excluded.can_manage_calendar,
+          can_supervise=excluded.can_supervise,granted_at=now()`,
+          [
+            options.responsibility,
+            requested.groups,
+            requested.calendar,
+            requested.supervise,
+          ],
+        );
+      } else
+        await db.query(
+          'delete from public.department_operation_capabilities where responsibility_id=$1',
+          [options.responsibility],
+        );
+      await db.query(
+        `insert into public.department_operation_grant_history(responsibility_id,actor_id,
+        old_groups,new_groups,old_calendar,new_calendar,old_supervise,new_supervise)
+        values($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          options.responsibility,
+          options.operator,
+          previous.groups,
+          requested.groups,
+          previous.calendar,
+          requested.calendar,
+          previous.supervise,
+          requested.supervise,
+        ],
+      );
+      await db.query('commit');
+      inTransaction = false;
+      console.log(
+        'COMMITTED: exact-department operation grants changed and audited.',
+      );
+      return;
+    }
 
     if (
       ['reassign-counselors', 'revoke-counselors'].includes(options.command)

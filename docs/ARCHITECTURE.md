@@ -188,13 +188,35 @@ continuously at a 15-second interval. Hosted scheduling and real provider
 acceptance remain unverified deployment boundaries. See [NOTIFICATIONS.md](NOTIFICATIONS.md)
 for lease/retry semantics, local commands, limits and actual browser evidence.
 
-## Future academic workflows — not implemented
+## Session 2 group, calendar and supervisory models
 
-Groups/dynamic membership, recurrence generation, activity editing/cancellation,
-hosted push scheduling, counselor follow-up delivery and catch-up remain future work.
-They can reference the same Activity and assignment IDs. Group targeting is rejected,
-not expanded into simulated recipients. Reviewer verification remains an API operation;
-the current dashboards display accurate read-only review status.
+`academic_groups` gives `scopes(kind='group')` a direct department owner and
+free-text purpose. Effective-dated `student_scope_memberships` and actor/time
+history store current and past membership. Group publication takes a transactionally
+locked current-member snapshot, rechecks each target against the existing category
+CREATE scope, then calls the existing selected Activity/announcement RPCs. The
+durable assignment or announcement recipient rows never depend on later membership
+edits. Group provenance is stored separately from the shared completion model.
+
+`recurring_schedules`, sections and slots hold the configurable academic pattern;
+`academic_blackouts` hold explicit interruption windows. The authenticated runner
+uses the existing section Activity publisher, while `recurring_instances` uniquely
+records published, blocked, skipped or requeued occurrence keys. Blocked instances
+create no Activity and therefore no notification/outbox row. An added blackout
+never mutates an already-published Activity; the calendar reports that conflict.
+The anchor Monday is the first cycle. Local calendar times are interpreted in the
+schedule's IANA timezone and converted to stored UTC instants. An authorized
+creator may separately change a manual Activity deadline/end time with an audit
+row. No automatic production runner is active.
+
+`supervisory_overview` aggregates the existing assignments, completions, follow-ups
+and escalations for active students in a separately granted department. It does not
+own a second progress database. Its section and counselor counts derive from
+current trusted roster and mapping relationships. Group, calendar and supervision
+operation grants are independent of each other and of CREATE/READ/VERIFY.
+
+Activity cancellation, retroactive group reconciliation, hosted push/calendar
+scheduling and production roster onboarding remain future operational work.
 
 References: [Supabase Next.js SSR guidance](https://supabase.com/docs/guides/auth/server-side/creating-a-client),
 [SSR stability status](https://supabase.com/docs/guides/auth/server-side),

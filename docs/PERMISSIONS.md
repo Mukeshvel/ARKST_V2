@@ -196,6 +196,38 @@ read; a notification link alone never grants access. A disabled or switched
 account may still have an already in-flight provider request, but the service
 worker cannot show another account's private preview.
 
+## Session 2 operation boundaries
+
+Session 2 uses explicit `department_operation_capabilities` rows attached to a
+current exact-department staff responsibility. The three independent flags are
+`can_manage_groups`, `can_manage_calendar` and `can_supervise`. An approved admin
+provisions/revokes them through the trusted local preview/transactional CLI; changes
+are audited in `department_operation_grant_history`. None is inferred from role name,
+profile teaching status, section preference, designation, email or another flag.
+
+Group management may list the department's eligible roster and current/historical
+group members. It does not grant publication by itself: the existing category CREATE
+predicate must authorize every current target section. Group publication does not
+grant Activity READ/VERIFY or counselor private-student access. Calendar management
+permits configuration and invoking the runner; generation separately requires current
+`weekly_test` CREATE for every selected section. Only the original creator with
+current category CREATE for all target sections can change an Activity deadline.
+The runner and blackout writes serialize by department; counselor mapping mutations
+serialize before the original non-overlap exclusion constraint.
+
+Supervision is a separate trusted private-roster grant. Its RPC checks the exact
+department and any requested child section, then returns bounded detail and complete
+current-scope counts. Assignment and case counts require Activity origin in the
+granted department, and the per-student detail RPC additionally requires an active
+roster entry. Department CREATE, group management and calendar management do
+not imply private supervisory reads. The current counselor view still requires the
+administrator-created effective-dated counselor mapping; editable staff fields never
+change it. Direct authenticated writes and direct reads of the new configuration,
+membership history, occurrence and grant tables are revoked, with RLS enabled.
+
+The provisional table below describes possible future college policy. It does not
+auto-provision the Session 2 flags or alter the current explicit grants.
+
 ## Future role-to-capability policy — provisional and not implemented
 
 | Responsibility        | Proposed capability and scope                                                                                  |

@@ -131,3 +131,119 @@ trusted scheduler and approved secrets. No actual departmental data, hosted Auth
 Google OAuth, dynamic groups or recurring academic schedule is configured here.
 Session 2 can add recurrence and dynamic groups after this Session 1 state is reviewed;
 it should not replace the Activity, identity or notification models.
+
+## Session 2 current operations
+
+The earlier sections record the Session 1 state. Session 2 adds the following
+operations to the same identity, Activity, assignment, completion, follow-up and
+notification models.
+
+### Trusted grants
+
+The exact-department `department_operation_capabilities` row belongs to a current
+staff `responsibility_assignments` row. `can_manage_groups`, `can_manage_calendar`
+and `can_supervise` are independent of each other and of Activity category CREATE,
+READ and VERIFY. Role names, staff teaching preferences and designation text grant
+none of them. Only a trusted administrator with a current exact-department admin
+responsibility and local database-owner access can run the preview/transactional
+operator command:
+
+```powershell
+# LOCAL_DATABASE_URL must be the existing loopback Supabase DB URL; do not paste it in chat.
+node scripts/directory-admin.mjs grant-operations --operator <admin-user-uuid> --department <department-scope-uuid> --responsibility <staff-responsibility-uuid> --groups true --calendar false --supervise false
+# Review PREVIEW. Repeat with --apply to save and audit; use all false to revoke.
+```
+
+The script checks both current responsibilities again under transaction locks before
+writing. `department_operation_grant_history` records old/new flags, actor and time.
+No staff profile edit can invoke this path or directly edit the table.
+
+### Groups and publication
+
+`/dashboard/groups` lists groups only to a staff account with the exact department
+group grant. Name and purpose are free text (for example RHP, NPTEL or placement),
+so new groups require no code change. The manager can edit/disable a group, search
+eligible active linked roster students, add/remove members, see current members
+including later-inactive members, and page membership history. Adding checks the
+student's active roster/profile and direct section membership. Duplicate membership
+is rejected; removal records an effective end and actor/time history. Disabling a
+group blocks additions and publication while still permitting authorized removal
+of existing members.
+
+Group Activity and announcement publication locks the group, checks **every** current
+member against the existing category CREATE authorization, and invokes the existing
+selected-student Activity or announcement publisher in one transaction. An empty,
+oversized (over 500), inactive or cross-scope audience cannot silently publish.
+The saved `activity_assignments`/`announcement_recipients` and target-section rows
+are the immutable publication snapshot; `activity_target_groups` and
+`announcement_target_groups` retain group provenance. Member edits never add or
+remove recipients from earlier publications. Completion, verification, monitoring,
+follow-up and outbox notices use the established rows. An inactive current group
+member must be explicitly removed before a new publication; their earlier assigned
+work remains historical.
+
+### Weekly external-test calendar
+
+`/dashboard/calendar` requires the independent calendar grant. A schedule starts
+**paused**. The manager chooses an anchor Monday, IANA timezone (initially
+`Asia/Kolkata`), 1–4 week cycle and 1–20 department sections. Slots hold editable
+position, cycle week, start/end weekday and **local** 24-hour times, title,
+description, verification requirement and active status. The initial suggested
+two-week rows are Test 1 Mon–Wed, Test 2 Thu–Sat, Test 3 Mon–Tue, Test 4 Wed–Thu,
+Test 5 Fri–Sat. Staff must enter actual approved hours; these are availability
+windows for external tests, not online exams. Overlap within a cycle is rejected.
+Slot and section edits affect only future generation, never an already-published
+Activity. The generated Activity deadline equals the end of its availability window.
+
+An active department blackout records exact UTC start/end instants and blocks any
+new occurrence whose window overlaps it. The runner records a `blocked` occurrence
+with no Activity, assignment or notification. Deactivating a blackout does not
+silently generate it: an authorized manager must explicitly requeue, then rerun,
+or keep it skipped. A blackout created after publication shows a visible conflict;
+the already-published Activity is not deleted or changed. The unique
+`(schedule_id,slot_id,cycle_monday)` key and schedule row lock make repeated and
+concurrent runs idempotent. Generation begins at the anchor Monday and uses the
+existing `create_section_activity('weekly_test',...)` function, which rechecks the
+runner's current CREATE authority for each selected section. Instance history and
+conflicts are visible in the calendar UI.
+
+The **Generate due instances** button runs the next 14 days synchronously. The
+same real operation can be invoked from the trusted local CLI. Put the approved
+staff email/password in Git-ignored `.env.scheduler.local` as
+`ARKST_SCHEDULER_EMAIL` and `ARKST_SCHEDULER_PASSWORD` (or inject both as
+process environment variables), then run:
+
+```powershell
+$env:APP_ENV='local'; npm run calendar:run:local
+```
+
+The CLI confirms the Supabase API is loopback, signs in through real Auth, enumerates
+only that account's calendar grants, and reports published/blocked/existing counts.
+It clears only its own in-process session; it does not revoke an operator's other
+browser sessions. A dedicated, restricted scheduler identity is recommended.
+It was exercised with a synthetic authorized staff login. **No background job is
+running.** Automatic operation requires an approved always-on host, secure staff
+credential storage and rotation, a scheduled invocation interval, logs/alerting and
+network access to the target Supabase Auth/API. Production hosting must implement
+and test that process explicitly. The existing Web Push dispatcher is separate and
+also needs a trusted host schedule.
+
+Manual NPTEL and other Activities keep their configured dates. The original creator
+with current category CREATE scope can change deadline/end time from their Activity
+result page; PostgreSQL validates the window and writes old/new times, actor and time
+to `activity_window_changes`. No existing assignment is silently replaced.
+
+### Supervision
+
+`/dashboard/supervision` requires a separate exact-department `can_supervise`
+grant. It reports active roster students' existing assignments, submitted reports,
+awaiting-verification, verified, pending/overdue, open follow-ups and escalations.
+Section and current counselor aggregates use the same records, and student detail is
+paged at 50 rows. The student's **View work** control opens paged Activity,
+completion and open case detail under that exact-department grant. A department
+CREATE or group/calendar grant alone cannot read this private overview. Inactive
+students and expired counselor mappings are excluded from ordinary current
+supervision; historical rows remain stored. Activities originally targeted in a
+different department are excluded even if the student later transfers into this
+roster. Completion bars include submitted work awaiting verification; the numeric
+states remain distinct.

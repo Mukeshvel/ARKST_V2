@@ -170,3 +170,14 @@ desktop delivery evidence. Tab-closed delivery, logout/account-switch popup
 suppression in a real browser, and hosted HTTPS push still require direct
 verification. A trusted hosted scheduler and secret handling remain separate
 deployment work.
+
+# Session 2 recurring Activity boundary
+
+Recurring test generation calls the existing section Activity publisher only for
+non-blackout instances. A blocked or explicitly skipped occurrence has no Activity,
+assignment, inbox notification or outbox delivery job. A later blackout does not
+delete or rewrite a previously published Activity or its delivery history; the
+calendar shows the overlap for an authorized decision. Hosted calendar automation
+and hosted push dispatch remain separate unconfigured service schedules. The local
+Session 2 integration suite verifies the absence of blocked-instance outbox rows;
+it does not claim a new Windows popup or hosted delivery observation.

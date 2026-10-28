@@ -186,3 +186,15 @@ No department data has been imported. Tests do not use actual student or faculty
 Production Google sign-in, complete 124-student roster import, ongoing academic records,
 full directory UI beyond the self-service form, HOD/Admin workflows and counselor follow-up
 workflow remain unverified or out of scope.
+
+# Session 2 operation grants
+
+The trusted local `directory-admin.mjs grant-operations` command adds an independent
+exact-department group, calendar or supervisory grant to an already approved current
+staff responsibility. It previews by default, requires a current exact-department
+admin operator, rechecks both responsibilities under lock at apply time, and writes
+old/new flags with actor/time to `department_operation_grant_history`. Supplying
+`false` for all three flags revokes the capability row. The command accepts only the
+loopback local database URL and does not provision an Auth account. Faculty profile
+edits, custom designation and preferred sections cannot change these grants or
+counselor mappings. See [WORKFLOWS.md](WORKFLOWS.md) for the complete command.

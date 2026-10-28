@@ -154,7 +154,7 @@ Auth suite is required separately. See PROJECT_STATUS.md for observed results.
 
 ## Limits and next decisions
 
-No group/dynamic targeting, counselor follow-up workflow, dashboards, notifications,
+At the Milestone 3A checkpoint, no group/dynamic targeting, counselor follow-up workflow, dashboards, notifications,
 follow-up, catch-up, recurrence generation, editing/cancellation, evidence uploads or
 rejection/resubmission exists. Direct assignments and history provide stable references
 for future work. No profile roster endpoint or administrative/delegation tool exists.
@@ -236,7 +236,25 @@ All three RPCs derive the caller from the real Auth session, use fixed empty sea
 paths, are granted only to `authenticated`, and return a bounded page. No extra
 completion pool or client-side success simulation exists. Section targeting is a
 publication-time snapshot; retroactive enrollment reconciliation, cancellation,
-group targeting, reviewer assignment policy and dashboard UI remain future work.
+At that checkpoint, group targeting, reviewer assignment policy and dashboard UI remained future work.
+
+## Session 2 group and recurring publication
+
+The group publisher expands current effective-dated membership only at publication
+time. It requires an independent group-management grant **and** the existing
+category CREATE scope for every member's current section. It calls the selected
+Activity publisher, so `activity_assignments`, `activity_completions`, section
+snapshots, history and notifications retain their established behavior. Later
+membership edits do not alter an Activity. Group provenance and membership history
+are separate metadata; no category-specific completion tables were introduced.
+
+The recurring runner generates ordinary `weekly_test` section Activities through
+the existing section publisher, rechecking current CREATE permission for each
+section. A unique schedule/slot/cycle key prevents duplicates. Blacked-out windows
+store a blocked instance without an Activity or reminder; published work is never
+silently changed by a later blackout. Manually created categories such as NPTEL
+keep individual dates, with creator-scoped audited deadline/end changes. Hosted
+automation is not running; see [WORKFLOWS.md](WORKFLOWS.md).
 
 ## Milestone 3B-2B: browser workflows
 
