@@ -5,6 +5,7 @@ import path from 'node:path';
 import { existsSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { localFetch, localUrl } from '../tests/integration/local-helpers.mjs';
+import { runAuthorizedSchedules } from './lib/recurring-runner.mjs';
 
 const execute = promisify(execFile);
 async function main() {
@@ -50,35 +51,8 @@ async function main() {
   });
   if (signIn.error || !signIn.data.user)
     throw new Error('Real scheduler staff sign-in failed.');
-  const grants = await client.rpc('department_operation_options');
-  if (grants.error || !Array.isArray(grants.data))
-    throw new Error('Calendar grants could not be loaded.');
-  let schedules = 0,
-    published = 0,
-    blocked = 0,
-    existing = 0;
-  for (const department of grants.data.filter((row) => row.manageCalendar)) {
-    const overview = await client.rpc('calendar_overview', {
-      p_department: department.departmentId,
-    });
-    if (overview.error || !Array.isArray(overview.data?.schedules))
-      throw new Error('Calendar overview failed for an approved department.');
-    for (const schedule of overview.data.schedules.filter(
-      (row) => !row.paused,
-    )) {
-      const run = await client.rpc('run_due_recurring_schedule', {
-        p_schedule: schedule.id,
-      });
-      if (run.error || !run.data || typeof run.data.published !== 'number')
-        throw new Error(
-          `Recurring generation failed for schedule ${schedule.id}; database code ${run.error?.code ?? 'unavailable'}.`,
-        );
-      schedules++;
-      published += run.data.published;
-      blocked += run.data.blocked;
-      existing += run.data.existing;
-    }
-  }
+  const { schedules, published, blocked, existing } =
+    await runAuthorizedSchedules(client);
   console.log(
     `Real local recurring runner: ${schedules} active schedules; ${published} published, ${blocked} blackout-blocked, ${existing} already recorded.`,
   );

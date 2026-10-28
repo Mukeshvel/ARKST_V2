@@ -1,4 +1,4 @@
-# ARKST — secure Activity engine
+# ARKST V2 — scoped college Activity operations
 
 Milestones 1, 2.1 and 3A are preserved. Milestone 3B-1 adds a structured department
 roster, approved counselor-student mappings and self-service staff profiles on the real
@@ -21,8 +21,9 @@ For genuine local login, follow [LOCAL_SUPABASE](docs/LOCAL_SUPABASE.md). Passwo
 requires `APP_ENV=local`, a loopback `APP_ORIGIN`, a loopback `SUPABASE_URL` and the
 local publishable/anon key. Use the exact APP_ORIGIN in your browser. No public signup
 or role assignment exists. Only trusted operators provision profiles and scoped roles.
-Google OAuth and hosted onboarding are not enabled. Never put service-role keys in
-the application environment; they are only used in separate isolated test setup.
+Google OAuth has an opt-in application path but requires approved Google/Supabase
+provider setup and real hosted verification. Never put service-role or owner keys in
+the application environment; trusted operator processes use a separate environment.
 
 ```sh
 npm run check
@@ -62,8 +63,8 @@ See [IDENTITY_TESTS](docs/IDENTITY_TESTS.md). Set `SMOKE_ORIGIN` for another loc
 - `scripts`, `tests/integration`: smoke and real isolated Auth/database/HTTP tests.
 - `docs`: architecture, domain, permissions, decisions, setup and evidence.
 
-Start subsequent sessions with [PROJECT_STATUS](docs/PROJECT_STATUS.md), then read
-[DECISIONS](docs/DECISIONS.md) and [PERMISSIONS](docs/PERMISSIONS.md). Scope stops at
-Milestone 3A. Do not treat authored SQL or tests as executed. No remote resources,
-production migrations, deployments, commits or pushes were made. Zero paid
-infrastructure remains a target; hosted capacity/recovery requirements are undecided.
+Start subsequent sessions with [GO_ACCOUNT_HANDOFF](docs/GO_ACCOUNT_HANDOFF.md),
+[PROJECT_STATUS](docs/PROJECT_STATUS.md) and [RELEASE_OPERATIONS](docs/RELEASE_OPERATIONS.md).
+The current code includes Milestones 1–5 and the completion sprint workflows. Do not
+treat local verification as hosted readiness. Session 3 made no production migration,
+deployment, commit or push; hosted capacity and recovery still require approval.

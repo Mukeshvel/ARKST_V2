@@ -57,7 +57,8 @@ export async function clearApplicationSession() {
   for (const cookie of store.getAll()) {
     if (
       cookie.name === AUTH_COOKIE ||
-      cookie.name.startsWith(`${AUTH_COOKIE}.`)
+      cookie.name.startsWith(`${AUTH_COOKIE}.`) ||
+      cookie.name.startsWith(`${AUTH_COOKIE}-`)
     )
       store.set(cookie.name, '', {
         path: '/',

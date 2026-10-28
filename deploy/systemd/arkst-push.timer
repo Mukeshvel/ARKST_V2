@@ -1,0 +1,11 @@
+[Unit]
+Description=Drain ARKST push outbox once per minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=true
+Unit=arkst-push.service
+
+[Install]
+WantedBy=timers.target

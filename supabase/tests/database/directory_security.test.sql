@@ -12,6 +12,10 @@ from unnest(array['department_student_roster','counselor_student_mappings','staf
 select ok(not has_table_privilege('authenticated','public.'||name,'INSERT,UPDATE,DELETE'),name||' denies direct client writes')
 from unnest(array['department_student_roster','counselor_student_mappings','staff_directory_profiles','staff_section_preferences','department_directory_audit']) name;
 select ok(not has_column_privilege('authenticated','public.department_student_roster','institutional_email','SELECT'),'counselor roster access excludes institutional email');
+select ok((select relrowsecurity from pg_class where oid='public.trusted_operator_history'::regclass),'trusted operator changes enforce RLS');
+select ok(not has_table_privilege('authenticated','public.trusted_operator_history','SELECT,INSERT,UPDATE,DELETE'),'staff cannot read or write trusted operator history directly');
+select ok(not has_table_privilege('anon','public.trusted_operator_history','SELECT,INSERT'),'anonymous cannot access trusted operator history');
+select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='department_roster_unique_institutional_email'),'approved roster email is globally unique');
 select ok(not has_function_privilege('anon','public.update_staff_directory_profile(text,text,text[],uuid[])','EXECUTE'),'anonymous cannot update staff profile');
 select ok(exists(select 1 from pg_constraint where conrelid='public.counselor_student_mappings'::regclass and conname='one_primary_counselor_per_instant' and contype='x'),'database excludes overlapping primary counselor intervals');
 select ok(exists(select 1 from pg_trigger where tgrelid='public.department_student_roster'::regclass and tgname='roster_relationship_guard' and not tgisinternal),'database validates roster department and section');

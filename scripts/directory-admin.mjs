@@ -1,7 +1,7 @@
-// Trusted, local-only operator workflows. Preview is read-only; --apply is one DB transaction.
+// Trusted operator workflows. Preview is read-only; --apply is one DB transaction.
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { localUrl } from '../tests/integration/local-helpers.mjs';
+import { operatorDatabaseConfig } from './lib/operator-db.mjs';
 
 function args(argv) {
   const [command, ...rest] = argv;
@@ -79,7 +79,9 @@ async function main() {
   if (
     ![
       'provision-staff',
+      'provision-student',
       'import-roster',
+      'update-roster',
       'import-counselors',
       'reassign-counselors',
       'revoke-counselors',
@@ -87,26 +89,12 @@ async function main() {
     ].includes(options.command)
   )
     throw new Error(
-      'Use provision-staff, grant-operations, import-roster, import-counselors, reassign-counselors or revoke-counselors.',
+      'Use provision-staff, provision-student, grant-operations, import-roster, update-roster, import-counselors, reassign-counselors or revoke-counselors.',
     );
-  const connection = process.env.LOCAL_DATABASE_URL;
-  if (!connection)
-    throw new Error(
-      'Set LOCAL_DATABASE_URL to the isolated local Supabase database.',
-    );
-  localUrl(
-    connection,
-    ['postgres:', 'postgresql:'],
-    'LOCAL_DATABASE_URL',
-    true,
-  );
+  const connection = operatorDatabaseConfig(process.env, options);
   if (!uuid(options.operator) || !uuid(options.department))
     throw new Error('A valid --operator and --department are required.');
-  const db = new pg.Client({
-    connectionString: connection,
-    connectionTimeoutMillis: 5000,
-    query_timeout: 10000,
-  });
+  const db = new pg.Client(connection);
   await db.connect();
   let inTransaction = false;
   try {
@@ -515,6 +503,248 @@ async function main() {
       return;
     }
 
+    if (options.command === 'provision-student') {
+      if (
+        !uuid(options.user) ||
+        !options.student ||
+        !options.email ||
+        options.student.length > 80 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(options.email) ||
+        options.email !== options.email.toLowerCase()
+      )
+        throw new Error(
+          'provision-student requires --user UUID, --student approved identifier and --email lowercase approved institutional address.',
+        );
+      const target = await db.query(
+        `select r.id,r.display_name,r.section_scope_id,r.institutional_email,u.email,u.email_confirmed_at,p.id profile_id
+         from public.department_student_roster r join auth.users u on u.id=$3
+         left join public.profiles p on p.id=u.id
+         where r.department_scope_id=$1 and r.external_student_id=$2 and r.active and r.linked_student_id is null`,
+        [options.department, options.student, options.user],
+      );
+      const row = target.rows[0];
+      if (
+        target.rowCount !== 1 ||
+        row.profile_id ||
+        !row.email_confirmed_at ||
+        row.institutional_email !== options.email ||
+        row.email?.toLowerCase() !== options.email ||
+        row.display_name.length > 120
+      )
+        throw new Error(
+          'Approved unlinked roster, confirmed matching Auth email and unprovisioned student profile are required.',
+        );
+      console.log(
+        `PREVIEW ${JSON.stringify({ studentIdentifier: options.student, userId: options.user, sectionScopeId: row.section_scope_id, emailMatched: true })}`,
+      );
+      if (!options.apply) {
+        console.log('PREVIEW ONLY. No records written. Add --apply to commit.');
+        return;
+      }
+      await db.query('begin');
+      inTransaction = true;
+      const currentAdmin = await db.query(
+        `select r.id from public.profiles p join public.responsibility_assignments r on r.user_id=p.id
+         where p.id=$1 and p.is_active and p.account_kind='staff' and r.role='admin' and r.scope_id=$2
+           and r.starts_at<=now() and (r.ends_at is null or now()<r.ends_at) for share of r`,
+        [options.operator, options.department],
+      );
+      const locked = await db.query(
+        `select r.id,r.display_name,r.section_scope_id,r.institutional_email,u.email,u.email_confirmed_at,p.id profile_id
+         from public.department_student_roster r join auth.users u on u.id=$3
+         left join public.profiles p on p.id=u.id
+         where r.department_scope_id=$1 and r.external_student_id=$2 and r.active and r.linked_student_id is null
+         for update of r,u`,
+        [options.department, options.student, options.user],
+      );
+      const actual = locked.rows[0];
+      if (
+        !currentAdmin.rowCount ||
+        locked.rowCount !== 1 ||
+        actual.id !== row.id ||
+        actual.profile_id ||
+        !actual.email_confirmed_at ||
+        actual.email?.toLowerCase() !== options.email ||
+        actual.institutional_email !== options.email ||
+        actual.section_scope_id !== row.section_scope_id ||
+        actual.display_name !== row.display_name
+      )
+        throw new Error(
+          'Admin, roster or Auth identity changed since preview; review again.',
+        );
+      await db.query(
+        "insert into public.profiles(id,display_name,account_kind,is_active) values($1,$2,'student',true)",
+        [options.user, actual.display_name],
+      );
+      await db.query(
+        'update public.department_student_roster set linked_student_id=$2,updated_at=now() where id=$1',
+        [actual.id, options.user],
+      );
+      await db.query(
+        'insert into public.student_scope_memberships(student_id,scope_id) values($1,$2)',
+        [options.user, actual.section_scope_id],
+      );
+      await db.query(
+        "insert into public.department_directory_audit(actor_id,entity_type,entity_id,action,changes) values($1,'student_roster',$2,'linked',$3)",
+        [
+          options.operator,
+          actual.id,
+          {
+            student_identifier: options.student,
+            linked_student_id: options.user,
+            section_scope_id: actual.section_scope_id,
+          },
+        ],
+      );
+      await db.query('commit');
+      inTransaction = false;
+      console.log(
+        'COMMITTED: approved existing Auth identity linked to roster and student profile.',
+      );
+      return;
+    }
+
+    if (options.command === 'update-roster') {
+      if (!options.file)
+        throw new Error(
+          'An administrator-approved CSV is required via --file.',
+        );
+      const records = csv(await readFile(options.file, 'utf8'));
+      const header =
+        'student_identifier|new_student_identifier|display_name|institutional_email';
+      if (
+        !records.length ||
+        records.length > 10000 ||
+        Object.keys(records[0]).join('|') !== header
+      )
+        throw new Error(
+          `CSV requires 1–10,000 rows and headers: ${header.replaceAll('|', ',')}`,
+        );
+      const oldIds = records.map((r) => r.student_identifier);
+      const newIds = records.map((r) => r.new_student_identifier);
+      const emails = records.map((r) => r.institutional_email);
+      if (
+        oldIds.some((x) => !x || x.length > 80) ||
+        new Set(oldIds).size !== oldIds.length ||
+        newIds.some((x) => !x || x.length > 80) ||
+        new Set(newIds).size !== newIds.length ||
+        emails.some(
+          (x) =>
+            x &&
+            (x.length > 254 ||
+              x !== x.toLowerCase() ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)),
+        ) ||
+        new Set(emails.filter(Boolean)).size !==
+          emails.filter(Boolean).length ||
+        records.some((r) => !r.display_name || r.display_name.length > 160)
+      )
+        throw new Error(
+          'Roster correction identifiers, names or unique lowercase email addresses are invalid.',
+        );
+      if (options.apply) {
+        await db.query('begin');
+        inTransaction = true;
+        const currentAdmin = await db.query(
+          `select r.id from public.profiles p join public.responsibility_assignments r on r.user_id=p.id
+          where p.id=$1 and p.is_active and p.account_kind='staff' and r.role='admin' and r.scope_id=$2
+          and r.starts_at<=now() and (r.ends_at is null or now()<r.ends_at) for share of r`,
+          [options.operator, options.department],
+        );
+        if (!currentAdmin.rowCount)
+          throw new Error(
+            'Operator admin responsibility is no longer current.',
+          );
+      }
+      for (const correction of [...records].sort((a, b) =>
+        a.student_identifier.localeCompare(b.student_identifier),
+      )) {
+        const found = await db.query(
+          `select r.id,r.external_student_id,r.display_name,r.institutional_email,r.linked_student_id,u.email auth_email
+          from public.department_student_roster r left join auth.users u on u.id=r.linked_student_id
+          where r.department_scope_id=$1 and r.external_student_id=$2 ${options.apply ? 'for update of r' : ''}`,
+          [options.department, correction.student_identifier],
+        );
+        if (found.rowCount !== 1)
+          throw new Error(
+            `Unknown roster identifier ${correction.student_identifier}.`,
+          );
+        const row = found.rows[0];
+        if (
+          row.linked_student_id &&
+          (!correction.institutional_email ||
+            row.auth_email?.toLowerCase() !== correction.institutional_email)
+        )
+          throw new Error(
+            `Linked student ${correction.student_identifier} must retain the verified Auth email.`,
+          );
+        if (row.linked_student_id && correction.display_name.length > 120)
+          throw new Error(
+            `Linked student ${correction.student_identifier} name exceeds profile limit.`,
+          );
+        if (
+          correction.new_student_identifier === row.external_student_id &&
+          correction.display_name === row.display_name &&
+          (correction.institutional_email || null) === row.institutional_email
+        )
+          throw new Error(
+            `Roster correction ${correction.student_identifier} has no changes.`,
+          );
+        console.log(
+          `PREVIEW ${JSON.stringify({
+            previousIdentifier: row.external_student_id,
+            nextIdentifier: correction.new_student_identifier,
+            previousName: row.display_name,
+            nextName: correction.display_name,
+            emailChanged:
+              (correction.institutional_email || null) !==
+              row.institutional_email,
+          })}`,
+        );
+        if (!options.apply) continue;
+        await db.query(
+          `update public.department_student_roster set external_student_id=$2,display_name=$3,
+          institutional_email=$4,updated_at=now() where id=$1`,
+          [
+            row.id,
+            correction.new_student_identifier,
+            correction.display_name,
+            correction.institutional_email || null,
+          ],
+        );
+        if (row.linked_student_id)
+          await db.query(
+            "update public.profiles set display_name=$2 where id=$1 and account_kind='student'",
+            [row.linked_student_id, correction.display_name],
+          );
+        await db.query(
+          "insert into public.department_directory_audit(actor_id,entity_type,entity_id,action,changes) values($1,'student_roster',$2,'updated',$3)",
+          [
+            options.operator,
+            row.id,
+            {
+              old_identifier: row.external_student_id,
+              new_identifier: correction.new_student_identifier,
+              old_name: row.display_name,
+              new_name: correction.display_name,
+              email_changed:
+                (correction.institutional_email || null) !==
+                row.institutional_email,
+            },
+          ],
+        );
+      }
+      if (options.apply) {
+        await db.query('commit');
+        inTransaction = false;
+        console.log(
+          `COMMITTED: ${records.length} roster correction(s) audited.`,
+        );
+      } else
+        console.log('PREVIEW ONLY. No records written. Add --apply to commit.');
+      return;
+    }
+
     if (!options.file)
       throw new Error('An administrator-approved CSV is required via --file.');
     const content = await readFile(options.file, 'utf8');
@@ -528,10 +758,19 @@ async function main() {
             'linked_student_id',
           ]
         : ['student_identifier', 'counselor_responsibility_id', 'starts_at'];
+    const rosterWithEmail = [...expected, 'institutional_email'];
     if (records.length < 1 || records.length > 10000)
       throw new Error('CSV must contain 1–10,000 data rows.');
-    if (Object.keys(records[0]).join('|') !== expected.join('|'))
-      throw new Error(`CSV header must be exactly: ${expected.join(',')}`);
+    if (
+      Object.keys(records[0]).join('|') !== expected.join('|') &&
+      !(
+        options.command === 'import-roster' &&
+        Object.keys(records[0]).join('|') === rosterWithEmail.join('|')
+      )
+    )
+      throw new Error(
+        `CSV header must be exactly: ${expected.join(',')}${options.command === 'import-roster' ? ' (optional institutional_email column)' : ''}`,
+      );
     const ids = records.map((x) => x.student_identifier);
     if (
       ids.some((x) => !x || x.length > 80) ||
@@ -556,6 +795,10 @@ async function main() {
           !r.display_name ||
           r.display_name.length > 160 ||
           !uuid(r.section_scope_id) ||
+          (r.institutional_email &&
+            (r.institutional_email.length > 254 ||
+              r.institutional_email !== r.institutional_email.toLowerCase() ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.institutional_email))) ||
           (!['', 'null'].includes(r.linked_student_id) &&
             !uuid(r.linked_student_id))
         )
@@ -582,6 +825,16 @@ async function main() {
           if (!profile.rowCount)
             throw new Error(
               `Row ${i + 2}: linked student is not active/provisioned.`,
+            );
+        }
+        if (linked && r.institutional_email) {
+          const auth = await db.query(
+            'select 1 from auth.users where id=$1 and lower(email)=$2 and email_confirmed_at is not null',
+            [linked, r.institutional_email],
+          );
+          if (!auth.rowCount)
+            throw new Error(
+              `Row ${i + 2}: linked Auth email must match the approved roster email.`,
             );
         }
         roster.push({ ...r, linked_student_id: linked });
@@ -658,8 +911,8 @@ async function main() {
     if (options.command === 'import-roster') {
       for (const r of roster) {
         const row = await db.query(
-          `insert into public.department_student_roster(department_scope_id,external_student_id,display_name,section_scope_id,linked_student_id,created_by)
-          values($1,$2,$3,$4,$5,$6) returning id`,
+          `insert into public.department_student_roster(department_scope_id,external_student_id,display_name,section_scope_id,linked_student_id,created_by,institutional_email)
+          values($1,$2,$3,$4,$5,$6,$7) returning id`,
           [
             options.department,
             r.student_identifier,
@@ -667,6 +920,7 @@ async function main() {
             r.section_scope_id,
             r.linked_student_id,
             options.operator,
+            r.institutional_email || null,
           ],
         );
         if (r.linked_student_id)

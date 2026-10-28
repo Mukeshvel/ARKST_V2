@@ -77,9 +77,15 @@ guards auth/data imports. The ordinary application uses only the publishable/ano
 with the user's session. Administrative test credentials are confined to the explicit
 local integration process and are never application/browser configuration.
 
-Application authorization keys off Supabase Auth UUIDs and trusted database records,
-so a future provider can reuse the same profile/role model. Google OAuth, hosted login,
-and hosted onboarding are not enabled or tested. Supabase local signup is disabled.
+Application authorization keys off Supabase Auth UUIDs and trusted database records.
+Session 3 adds an explicitly opt-in Google PKCE start and callback in
+`src/app/auth/google` that still requires an existing active profile. No provider
+credentials or hosted project were supplied, so Google exchange and hosted login
+remain untested. Supabase local signup is disabled; hosted signup must remain disabled.
+Trusted roster linking and capability/route commands run outside the web process.
+The calendar and push Node runners have opt-in hosted entry points with separate
+secrets; example `deploy/systemd` timers have not been activated. See
+[RELEASE_OPERATIONS.md](RELEASE_OPERATIONS.md) for the exact boundaries.
 No remote database has been connected, migrated, deployed or provisioned.
 
 Before hosting: repeat authentication/RLS tests in an approved environment, verify refresh and logout in a

@@ -101,7 +101,13 @@ must invoke it regularly, supply secrets securely, connect to the hosted
 Postgres endpoint, collect sanitized job metrics, and restart failed runs.
 No remote scheduler or dispatch HTTP route was created or activated. Hosted
 database connectivity, run frequency, request limits and cost have not been
-tested; reliable hosted background execution is a deployment blocker.
+tested; reliable hosted background execution is a deployment blocker. Session 3
+adds explicit `APP_ENV=hosted`, `PUSH_DISPATCH_ENABLED=true` and exact
+`PUSH_DATABASE_HOST` guards with TLS verification, plus an inactive systemd service
+and minute timer example in `deploy/systemd`. These are code/configuration
+preparation, not evidence of a running hosted dispatcher. Push is at least once:
+a crash after provider acceptance but before recording it can cause a retry and a
+duplicate browser notification. Monitor durable outbox state and failed attempts.
 
 Supabase documents scheduling Edge Functions with `pg_cron`/`pg_net` and Vault,
 and currently lists a Free plan Edge Function invocation quota. This Node

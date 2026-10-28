@@ -142,8 +142,12 @@ npm run test:directory-admin -- reassign-counselors --operator <approved-admin-u
 npm run test:directory-admin -- revoke-counselors --operator <approved-admin-uuid> --department <department-uuid> --file C:\approved\revocations.csv --apply
 ```
 
-This local-only CLI requires an owner connection and checks the operator UUID and exact
-department admin responsibility before reading/importing. The app has no roster,
+This CLI requires an owner connection and checks the operator UUID and exact
+department admin responsibility before reading/importing. Local use requires a
+loopback `LOCAL_DATABASE_URL`. Session 3 adds an explicit hosted operator mode with
+`APP_ENV=hosted`, `ARKST_HOSTED_ADMIN_ENABLED=true`, `ADMIN_DATABASE_URL` and an exact
+`--database-host` argument, with TLS certificate checks; hosted use is unverified.
+The app has no roster,
 counselor-mapping, staff-provisioning, HOD or admin management endpoint. Owner/service-role
 access can bypass RLS, so production administrative tooling, key custody, change approval,
 backup/rollback and durable operator audit review still need a separate security review.
@@ -186,6 +190,28 @@ No department data has been imported. Tests do not use actual student or faculty
 Production Google sign-in, complete 124-student roster import, ongoing academic records,
 full directory UI beyond the self-service form, HOD/Admin workflows and counselor follow-up
 workflow remain unverified or out of scope.
+
+## Session 3 approved email and operator operations
+
+`20261028002300_roster_email_identity.sql` adds a case-insensitive unique approved
+email across the roster. `import-roster` now optionally accepts a fifth
+`institutional_email` column; existing four-column files remain valid. A confirmed
+existing Auth user can be linked with `provision-student --operator ADMIN_UUID
+--department DEPARTMENT_UUID --student IDENTIFIER --user AUTH_UUID --email EMAIL`.
+The roster email must exactly match that Auth email, and preview is read-only until
+`--apply`. `update-roster` accepts
+`student_identifier,new_student_identifier,display_name,institutional_email`; it
+validates identifiers and linked-user email consistency, updates the linked profile
+name, and audits changes in one transaction. It cannot change the section or
+counselor mapping. Use the existing reassignment commands for counseling.
+
+`scripts/admin-operations.mjs` adds preview/apply commands for ordinary staff
+responsibilities, per-category CREATE/VERIFY, escalation routes and safe ending of
+responsibilities. It rejects self-assignment of HOD/admin and blocks removal while
+active routes, mappings or open cases need attention. Changes are recorded in the
+private `trusted_operator_history` table. This is a restricted operator tool, not a
+self-service profile page or public admin API. See
+[RELEASE_OPERATIONS.md](RELEASE_OPERATIONS.md) for invocation boundaries.
 
 # Session 2 operation grants
 

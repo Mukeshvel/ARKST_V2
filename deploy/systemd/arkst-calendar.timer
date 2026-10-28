@@ -1,0 +1,11 @@
+[Unit]
+Description=Check ARKST recurring schedules hourly
+
+[Timer]
+OnCalendar=hourly
+AccuracySec=1m
+Persistent=true
+Unit=arkst-calendar.service
+
+[Install]
+WantedBy=timers.target

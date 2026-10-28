@@ -1,0 +1,16 @@
+[Unit]
+Description=Generate authorized ARKST recurring Activities
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arkst
+Group=arkst
+WorkingDirectory=/opt/arkst/app
+EnvironmentFile=/etc/arkst/calendar.env
+ExecStart=/usr/bin/node /opt/arkst/app/scripts/run-recurring-hosted.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

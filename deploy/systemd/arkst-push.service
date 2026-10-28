@@ -1,0 +1,16 @@
+[Unit]
+Description=Dispatch bounded ARKST Web Push outbox
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=arkst
+Group=arkst
+WorkingDirectory=/opt/arkst/app
+EnvironmentFile=/etc/arkst/push.env
+ExecStart=/usr/bin/node /opt/arkst/app/scripts/dispatch-notifications.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

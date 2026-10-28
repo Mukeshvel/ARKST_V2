@@ -30,6 +30,7 @@ async function main() {
       'push',
       'workflows',
       'session2',
+      'session3',
     ].includes(suite),
   );
   const { stdout } = await execute(
@@ -68,6 +69,8 @@ async function main() {
   }
   const config = localTestConfiguration(environment);
   const appEnvironment = { ...environment };
+  if (suite === 'all' || suite === 'session3')
+    appEnvironment.GOOGLE_OAUTH_ENABLED = 'true';
   for (const key of Object.keys(appEnvironment)) {
     if (
       /SERVICE_ROLE|SECRET|PRIVATE_KEY|DATABASE_URL|SUPABASE_ACCESS_TOKEN|LOCAL_IDENTITY_TESTS/.test(
@@ -146,6 +149,8 @@ async function main() {
       await run('scripts/test-local-workflows.mjs');
     if (suite === 'all' || suite === 'session2')
       await run('scripts/test-local-session2.mjs');
+    if (suite === 'all' || suite === 'session3')
+      await run('scripts/test-local-session3.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');

@@ -1,4 +1,4 @@
-# Project status — through Completion Sprint Session 2, 2026-10-28
+# Project status — through Completion Sprint Session 3, 2026-10-28
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -653,3 +653,56 @@ One direct `npm run test:session2` invocation stopped before creating fixtures b
 and the focused and full suites passed. The first cleanup inspection used a
 nonexistent group-name column; the corrected read-only query confirmed zero
 remaining Session 2 groups.
+
+## Completion Sprint Session 3 — local code and release preparation
+
+**Starting checkpoint.** `main` was clean at committed `454c439` (Session 2).
+Session 3 continued on `main` without a branch, commit, push, deployment, remote
+Supabase connection or database reset. The existing reduced local Docker stack was
+healthy. The two forward migrations `02300_roster_email_identity` and
+`02400_trusted_operator_history` were applied once; local migration history now
+matches **37/37** files through `20261028002400`. No actual college account or
+roster was imported.
+
+**Application-side additions.** A disabled-by-default Google PKCE start and
+callback use Supabase SSR, exact-origin redirect validation, a real Auth code
+exchange and an existing active profile gate. No Google OAuth provider exchange
+was performed because institutional credentials and a hosted project are absent.
+Trusted operator commands now preview/apply roster corrections, link an existing
+confirmed Auth student to an approved unique roster email, assign/revoke ordinary
+staff responsibilities, grant exact category CREATE/VERIFY, and configure or
+remove escalation routes with private audit and transactional rechecks. The
+operator database connection is loopback-only by default; an explicit hosted
+mode requires an exact remote host and TLS verification. Hosted calendar and push
+entry points likewise require explicit flags and protected secrets. Inactive
+systemd service/timer examples and `RELEASE_OPERATIONS.md` prepare host setup;
+no hosted runner or timer has been activated.
+
+**Actual local verification.** `npm run test:rls` passed **7 files, 456 assertions**.
+`npm run check` passed Prettier, strict TypeScript, ESLint, **110 Vitest tests**, **20
+Node tests** and the optimized production build. With `APP_ENV=local` and
+`LOCAL_IDENTITY_TESTS=1`, `npm run test:local` passed smoke plus **103 real local
+Auth/HTTP/PostgreSQL integration groups**: identity 12, Activity 16, directory
+23, operations 9, push 13, Session 1 workflows 13, Session 2 groups 13, Session
+3 OAuth boundary 4. Synthetic fixture cleanup completed in every suite. The
+directory suite verified approved email linking, atomic roster correction and
+audited grant/route operations. Session 3 verified an exact Supabase Google PKCE
+authorization URL and verifier cookie, cross-origin rejection, and invalid-code
+denial; it did **not** verify a live Google callback or identity linking.
+
+The existing headless Edge tests exercised real persisted Activity publication,
+student completion, creator/counselor monitoring, follow-up/catch-up/attention,
+group editing, calendar pause/resume and supervision. Full workflows were
+verified across separate synthetic scenarios, **not one single combined college
+acceptance run**. The headless push browser again returned `Registration failed -
+permission denied`; the earlier normal-Chrome local Windows popup and corrected
+Activity click remain the only real desktop evidence. Hosted push, tab-closed
+delivery and account-switch behavior still require direct verification.
+
+**Operational limits.** An initial HOD/admin authority bootstrap requires a
+separate approved process; the ordinary operator CLI deliberately cannot create
+those roles. Trusted owner DB access must be restricted and audited outside the
+app. Production OAuth, data import, HTTPS hosting, monitored schedulers, backup/
+restore, device and staff acceptance are pending. The code is a candidate for a
+controlled staging deployment attempt after review, **not a deployed or approved
+college product**. See `GO_ACCOUNT_HANDOFF.md` and `RELEASE_OPERATIONS.md`.

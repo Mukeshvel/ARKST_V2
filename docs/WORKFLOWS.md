@@ -1,5 +1,34 @@
 # Follow-up, attention, escalation and catch-up — Session 1
 
+Session 3 operational summary: the existing pages and RPCs remain the source of
+truth. Trusted roster linking/correction and staff grant/route changes now have
+preview/apply CLI paths; Google OAuth is disabled by default and requires external
+provider setup; hosted push/calendar runners are opt-in and have not been activated.
+See [RELEASE_OPERATIONS.md](RELEASE_OPERATIONS.md) for the setup and verification
+boundary. No actual student/staff records have been imported.
+
+## End-to-end workflow inventory (Session 3 review)
+
+| Workflow                                                      | Code/data path                                                                     | Local evidence and remaining boundary                                                                                                                                      |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Provision identities, roster, roles, counselors, groups    | Trusted preview/apply CLI plus groups UI, Auth profile/scopes and audited mappings | Directory and Session 2 suites pass; initial HOD/admin bootstrap and real approved data remain external.                                                                   |
+| B. Faculty targets selected/counseling/group/section students | Shared Activity publication RPC/API with exact grants and snapshot assignments     | Activity, directory, operations and Session 2 suites pass; no real staff acceptance yet.                                                                                   |
+| C. Student receives/reports work                              | Inbox/outbox plus own Activity API and one completion row                          | Activity, push and workflow suites pass; actual external academic work is outside ARKST.                                                                                   |
+| D. Creator monitors authorized results                        | Faculty Activity summaries, detail, pending list                                   | Operations and Edge checks pass.                                                                                                                                           |
+| E. Counselor monitors mapped students                         | Current trusted mapping, paginated names/identifiers/charts/pending list           | Directory/operations/Edge checks pass; inactive/reassigned students lose ordinary current access.                                                                          |
+| F–G. Follow-up and resolution                                 | Durable follow-up/history/inbox; report resolves open case                         | Session 1 real Auth/API/PostgreSQL checks pass.                                                                                                                            |
+| H. Escalation                                                 | Trusted counselor/section coordinator/branch/HOD routes and case history           | Session 1 checks pass; actual route contacts and policy pending.                                                                                                           |
+| I. Catch-up                                                   | Student request, authorized review, separate official publication                  | Session 1 checks and Edge rendering pass; real institutional content pending.                                                                                              |
+| J. Informational announcement                                 | Shared target snapshots, inbox only                                                | Operations/group/Session 1 tests pass; creates no completion obligation.                                                                                                   |
+| K. Dynamic groups                                             | Authorized UI/API, membership history, publication snapshot                        | Session 2 API/database/Edge checks pass.                                                                                                                                   |
+| L. Recurring tests/blackouts                                  | Configurable slots, scheduler RPC, idempotent instances, conflict review           | Session 2 checks pass; hosted scheduler is prepared but inactive.                                                                                                          |
+| M. Supervisory progress                                       | Separate department grant, aggregate/detail from shared records                    | Session 2 RLS/API/Edge checks pass.                                                                                                                                        |
+| N. In-app and desktop notifications                           | Recipient inbox/outbox, per-user subscription, trusted dispatcher, service worker  | Local inbox/dispatcher checks pass; normal Chrome Windows popup/click observed in Milestone 5.1. Hosted delivery and tab-closed/account-switch behavior remain unverified. |
+
+This inventory reflects code and separate test evidence, not one combined acceptance
+scenario with institutional data. Neither a hosted Google login nor background job
+operation has been claimed as tested.
+
 This session extends the existing Activity, directory and inbox/outbox models. It does
 not perform academic work in ARKST: students complete NPTEL, tests and assignments
 externally, then report status against the existing Activity assignment. No production

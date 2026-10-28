@@ -42,6 +42,11 @@ export function parseIdentityEnvironment(
   }
   const local = env.APP_ENV === 'local';
   if (
+    env.GOOGLE_OAUTH_ENABLED &&
+    !['true', 'false'].includes(env.GOOGLE_OAUTH_ENABLED)
+  )
+    throw invalid();
+  if (
     local
       ? !isLoopback(endpoint.hostname) || !isLoopback(app.hostname)
       : endpoint.protocol !== 'https:' || app.protocol !== 'https:'
@@ -66,6 +71,7 @@ export function parseIdentityEnvironment(
     key,
     appOrigin: app.origin,
     local,
+    googleOAuthEnabled: env.GOOGLE_OAUTH_ENABLED === 'true',
     secureCookies: app.protocol === 'https:',
   };
 }

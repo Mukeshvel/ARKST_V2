@@ -36,6 +36,7 @@ async function main() {
     query_timeout: 10000,
   });
   const directory = path.resolve('scripts/directory-admin.mjs');
+  const operations = path.resolve('scripts/admin-operations.mjs');
   const temp = await mkdtemp(path.join(os.tmpdir(), 'arkst-directory-'));
   const ids = {
     department: randomUUID(),
@@ -140,6 +141,44 @@ async function main() {
         throw new Error(
           `Expected ${command} to fail, output: ${stdout}${stderr}`,
         );
+      return stdout + stderr;
+    } catch (error) {
+      if (expectSuccess) throw error;
+      assert.notEqual(error.code, 0);
+      return `${error.stdout ?? ''}${error.stderr ?? ''}`;
+    }
+  }
+  async function operationCommand(
+    command,
+    operator,
+    extra = [],
+    expectSuccess = true,
+  ) {
+    try {
+      const { stdout, stderr } = await exec(
+        process.execPath,
+        [
+          operations,
+          command,
+          '--operator',
+          operator.id,
+          '--department',
+          ids.department,
+          ...extra,
+        ],
+        {
+          env: {
+            LOCAL_DATABASE_URL: config.databaseUrl,
+            PATH: process.env.PATH,
+            SystemRoot: process.env.SystemRoot,
+          },
+          timeout: 20000,
+          maxBuffer: 1024 * 1024,
+          windowsHide: true,
+        },
+      );
+      if (!expectSuccess)
+        throw new Error(`Expected ${command} to fail: ${stdout}${stderr}`);
       return stdout + stderr;
     } catch (error) {
       if (expectSuccess) throw error;
@@ -2078,6 +2117,324 @@ async function main() {
         );
       },
     );
+    const futureStudent = await user(
+      'approved-future-student',
+      'student',
+      false,
+    );
+    await check(
+      'approved roster email links an existing confirmed Auth student without public signup',
+      async () => {
+        const file = await writeCsv(
+          'approved-student.csv',
+          `student_identifier,display_name,section_scope_id,linked_student_id,institutional_email\nNEW-71,Approved Student,${ids.sectionA},,${futureStudent.email}\n`,
+        );
+        await adminCommand('import-roster', operator, [
+          '--file',
+          file,
+          '--apply',
+        ]);
+        const argumentsForStudent = [
+          '--user',
+          futureStudent.id,
+          '--student',
+          'NEW-71',
+          '--email',
+          futureStudent.email,
+        ];
+        assert.match(
+          await adminCommand(
+            'provision-student',
+            operator,
+            argumentsForStudent,
+          ),
+          /PREVIEW ONLY/,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.profiles where id=$1',
+              [futureStudent.id],
+            )
+          ).rows[0].n,
+          0,
+        );
+        assert.match(
+          await adminCommand(
+            'provision-student',
+            deniedOperator,
+            argumentsForStudent,
+            false,
+          ),
+          /must be an active staff member/,
+        );
+        assert.match(
+          await adminCommand(
+            'provision-student',
+            operator,
+            [...argumentsForStudent, '--email', 'wrong@example.test'],
+            false,
+          ),
+          /must be a UUID|requires|matching Auth email|requires --user|requires --user UUID|Approved unlinked roster/,
+        );
+        await adminCommand('provision-student', operator, [
+          ...argumentsForStudent,
+          '--apply',
+        ]);
+        noDatabaseError(
+          await futureStudent.client.auth.signInWithPassword({
+            email: futureStudent.email,
+            password: futureStudent.password,
+          }),
+          'approved student Auth sign-in',
+        );
+        await futureStudent.browser.login(futureStudent);
+        assert.equal(
+          (await api(futureStudent, '/api/me')).profile.id,
+          futureStudent.id,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.student_scope_memberships where student_id=$1 and scope_id=$2',
+              [futureStudent.id, ids.sectionA],
+            )
+          ).rows[0].n,
+          1,
+        );
+        assert.match(
+          await adminCommand(
+            'provision-student',
+            operator,
+            [...argumentsForStudent, '--apply'],
+            false,
+          ),
+          /Approved unlinked roster/,
+        );
+      },
+    );
+    await check(
+      'roster corrections update identifiers and names atomically without changing assignments or identity',
+      async () => {
+        const correction = await writeCsv(
+          'roster-correction.csv',
+          `student_identifier,new_student_identifier,display_name,institutional_email\nNEW-71,NEW-0071,Corrected Student,${futureStudent.email}\n`,
+        );
+        assert.match(
+          await adminCommand('update-roster', operator, ['--file', correction]),
+          /PREVIEW ONLY/,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select external_student_id from public.department_student_roster where linked_student_id=$1',
+              [futureStudent.id],
+            )
+          ).rows[0].external_student_id,
+          'NEW-71',
+        );
+        await adminCommand('update-roster', operator, [
+          '--file',
+          correction,
+          '--apply',
+        ]);
+        const updated = (
+          await db.query(
+            'select external_student_id,display_name,linked_student_id from public.department_student_roster where linked_student_id=$1',
+            [futureStudent.id],
+          )
+        ).rows[0];
+        assert.equal(updated.external_student_id, 'NEW-0071');
+        assert.equal(updated.display_name, 'Corrected Student');
+        assert.equal(
+          (
+            await db.query(
+              'select display_name from public.profiles where id=$1',
+              [futureStudent.id],
+            )
+          ).rows[0].display_name,
+          'Corrected Student',
+        );
+        const duplicate = await writeCsv(
+          'roster-duplicate-correction.csv',
+          `student_identifier,new_student_identifier,display_name,institutional_email\nNEW-0071,1042,Wrong,${futureStudent.email}\n`,
+        );
+        assert.match(
+          await adminCommand(
+            'update-roster',
+            operator,
+            ['--file', duplicate, '--apply'],
+            false,
+          ),
+          /duplicate key/,
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select external_student_id from public.department_student_roster where linked_student_id=$1',
+              [futureStudent.id],
+            )
+          ).rows[0].external_student_id,
+          'NEW-0071',
+        );
+        assert.match(
+          await adminCommand(
+            'update-roster',
+            deniedOperator,
+            ['--file', correction],
+            false,
+          ),
+          /must be an active staff member/,
+        );
+        assert.equal(
+          (
+            await db.query(
+              "select count(*)::int n from public.department_directory_audit where entity_type='student_roster' and action='updated' and entity_id=$1",
+              [
+                (
+                  await db.query(
+                    'select id from public.department_student_roster where linked_student_id=$1',
+                    [futureStudent.id],
+                  )
+                ).rows[0].id,
+              ],
+            )
+          ).rows[0].n,
+          1,
+        );
+      },
+    );
+    await check(
+      'trusted ordinary responsibility, Activity grants and escalation routes are configurable and revocable',
+      async () => {
+        const assignment = [
+          '--user',
+          teacher.id,
+          '--role',
+          'coordinator',
+          '--scope',
+          ids.department,
+        ];
+        assert.match(
+          await operationCommand('assign-responsibility', operator, assignment),
+          /PREVIEW ONLY/,
+        );
+        assert.match(
+          await operationCommand(
+            'assign-responsibility',
+            deniedOperator,
+            [...assignment, '--apply'],
+            false,
+          ),
+          /administrator approval/,
+        );
+        assert.match(
+          await operationCommand(
+            'assign-responsibility',
+            operator,
+            [
+              '--user',
+              teacher.id,
+              '--role',
+              'hod',
+              '--scope',
+              ids.department,
+              '--apply',
+            ],
+            false,
+          ),
+          /approved ordinary role/,
+        );
+        await operationCommand('assign-responsibility', operator, [
+          ...assignment,
+          '--apply',
+        ]);
+        const added = (
+          await db.query(
+            "select id from public.responsibility_assignments where user_id=$1 and role='coordinator' and scope_id=$2 and ends_at is null",
+            [teacher.id, ids.department],
+          )
+        ).rows[0].id;
+        const grant = [
+          '--responsibility',
+          added,
+          '--category',
+          'weekly_test',
+          '--create',
+          'true',
+          '--verify',
+          'false',
+        ];
+        assert.match(
+          await operationCommand('grant-activity', operator, grant),
+          /PREVIEW ONLY/,
+        );
+        await operationCommand('grant-activity', operator, [
+          ...grant,
+          '--apply',
+        ]);
+        assert.ok(
+          (await api(teacher, '/api/activities/options')).options.some(
+            (row) => row.category_key === 'weekly_test',
+          ),
+        );
+        const route = [
+          '--section',
+          ids.sectionA,
+          '--role',
+          'coordinator',
+          '--responsibility',
+          added,
+        ];
+        await operationCommand('set-route', operator, [...route, '--apply']);
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.escalation_routes where section_scope_id=$1 and target_role=$2 and responsibility_id=$3 and active',
+              [ids.sectionA, 'coordinator', added],
+            )
+          ).rows[0].n,
+          1,
+        );
+        assert.match(
+          await operationCommand(
+            'end-responsibility',
+            operator,
+            ['--responsibility', added, '--apply'],
+            false,
+          ),
+          /routes or open cases/,
+        );
+        await operationCommand('set-route', operator, [
+          '--section',
+          ids.sectionA,
+          '--role',
+          'coordinator',
+          '--responsibility',
+          'none',
+          '--apply',
+        ]);
+        await operationCommand('end-responsibility', operator, [
+          '--responsibility',
+          added,
+          '--apply',
+        ]);
+        assert.ok(
+          !(await api(teacher, '/api/activities/options')).options.some(
+            (row) => row.category_key === 'weekly_test',
+          ),
+        );
+        assert.equal(
+          (
+            await db.query(
+              'select count(*)::int n from public.trusted_operator_history where actor_id=$1 and entity_id=$2',
+              [operator.id, added],
+            )
+          ).rows[0].n,
+          3,
+        );
+      },
+    );
   } catch (error) {
     failure = error;
   } finally {
@@ -2116,6 +2473,14 @@ async function main() {
         await db.query(
           'delete from public.department_directory_audit where actor_id=any($1::uuid[])',
           [users.map((x) => x.id)],
+        );
+        await db.query(
+          'delete from public.trusted_operator_history where actor_id=any($1::uuid[])',
+          [users.map((x) => x.id)],
+        );
+        await db.query(
+          'delete from public.escalation_routes where section_scope_id=any($1::uuid[])',
+          [[ids.sectionA, ids.sectionB]],
         );
         await db.query(
           'delete from public.staff_section_preferences where user_id=any($1::uuid[])',

@@ -274,6 +274,7 @@ export async function processClaim(client, job, send) {
 
 export async function dispatchDue({
   databaseUrl,
+  connectionOptions = {},
   send,
   limit = MAX_JOBS_PER_RUN,
   outboxIds = null,
@@ -293,6 +294,7 @@ export async function dispatchDue({
     connectionString: databaseUrl,
     connectionTimeoutMillis: 5000,
     query_timeout: 15000,
+    ...connectionOptions,
   });
   await client.connect();
   let claimed = 0,

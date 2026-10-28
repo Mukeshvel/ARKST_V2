@@ -57,6 +57,16 @@ it('rejects hosted HTTP', () =>
   expect(() =>
     parseIdentityEnvironment({ ...local, APP_ENV: 'hosted' }),
   ).toThrow());
+it('keeps Google OAuth off until explicitly enabled', () => {
+  expect(parseIdentityEnvironment(local)?.googleOAuthEnabled).toBe(false);
+  expect(
+    parseIdentityEnvironment({ ...local, GOOGLE_OAUTH_ENABLED: 'true' })
+      ?.googleOAuthEnabled,
+  ).toBe(true);
+  expect(() =>
+    parseIdentityEnvironment({ ...local, GOOGLE_OAUTH_ENABLED: 'yes' }),
+  ).toThrow();
+});
 it.each([
   'http://user:pass@localhost:54321',
   'http://localhost:54321/path',

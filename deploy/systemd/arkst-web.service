@@ -1,0 +1,19 @@
+[Unit]
+Description=ARKST Next.js application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=arkst
+Group=arkst
+WorkingDirectory=/opt/arkst/app
+EnvironmentFile=/etc/arkst/web.env
+ExecStart=/usr/bin/node /opt/arkst/app/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
