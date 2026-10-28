@@ -161,9 +161,25 @@ the private outbox.
 Notification/outbox inserts occur in the same transaction as Activity or
 announcement publication. A failure rolls back the whole publication. The
 unique `(recipient_id, source_kind, source_id)` key prevents duplicate inbox
-records for repeated processing of the same source. Desktop push has no worker
-or delivery claim in this milestone. A database owner remains a trusted
-privileged operator outside RLS.
+records for repeated processing of the same source. At Milestone 4 desktop
+push had no worker; Milestone 5 adds one without changing publication scope.
+A database owner remains a trusted privileged operator outside RLS.
+
+## Milestone 5 push boundary
+
+Only an active authenticated account can register, check or disable its own
+browser subscription through caller-scoped RPCs. Cross-account endpoint
+registration is rejected, and ordinary users have no table grants on stored
+endpoints, encryption keys, per-device outcomes or outbox claims. Registration
+is bounded at ten active devices per account under a profile-row lock. The
+public VAPID key alone is sent to browsers; private VAPID and database secrets
+remain in a trusted Node process. The dispatcher consumes exact notification
+recipients rather than recomputing audience from a profile or client IDs.
+It validates each stored endpoint against known HTTPS provider hosts before
+network access. Push previews require the current signed-in recipient's RLS
+read; a notification link alone never grants access. A disabled or switched
+account may still have an already in-flight provider request, but the service
+worker cannot show another account's private preview.
 
 ## Future role-to-capability policy — provisional and not implemented
 

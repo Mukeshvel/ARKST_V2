@@ -1,4 +1,4 @@
-# Project status — through Milestone 4, 2026-10-27
+# Project status — through Milestone 5.1, 2026-10-28
 
 The earlier Milestone 3B-1 record below describes the directory and its targeted security correction. Milestone 3B-2A adds real section assignment and creator/counselor monitoring; its results are recorded at the end. No actual departmental roster or production accounts were imported or created. This is not production readiness.
 
@@ -308,3 +308,147 @@ at 50; filters apply to the current page while summaries and copy use the full
 authorized set. Published recipients are a snapshot; later roster/mapping
 changes do not silently rewrite assignments or notifications. Local synthetic
 verification does not establish production readiness.
+
+## Milestone 5 — notification delivery foundation, 2026-10-28
+
+Started on clean `main` at `ddd0c07`, equal to `origin/main`. Work remains on
+`main`, uncommitted and unstaged. No database reset, hosted Supabase operation,
+deployment, remote scheduler, Git push or merge occurred. Existing identity,
+Activity, completion, counselor, announcement and inbox flows were preserved.
+
+Forward-only local migrations `20261028000100_push_delivery.sql`,
+`20261028000200_push_registration_limit.sql`,
+`20261028000300_notification_unread.sql` and
+`20261028000400_push_reactivation_limit.sql` were applied in order without
+rewriting prior migrations. They add private per-account device subscriptions,
+per-device push results, due/lease/retry/expiration state on the existing
+outbox, a serialized ten-active-device registration limit, and an own-recipient
+mark-unread RPC. The original notification row remains the durable source of
+truth; publication and recipient resolution still use the Milestone 4
+transaction and permission rules.
+
+The authenticated Inbox now has a real enable/disable control, service worker,
+read/unread actions, 20-second visible-tab polling, focus/reconnect refresh and
+a 30-second navigation unread count. The Node 24 dispatcher claims at most 20
+due jobs per run, sends at most eight devices per job pass, uses a three-minute
+lease and six bounded retry attempts before the 24-hour expiration. Invalid
+push endpoints are rejected before network access; 404/410 disables a device.
+The push payload contains only the opaque inbox ID. Before showing a generic
+desktop notice, the service worker checks the current signed-in recipient's
+RLS-protected preview and validates the same-origin destination. It does not
+cache the app. A provider 2xx means accepted for delivery, not viewed.
+
+| Command                                                                                           | Actual result                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npx supabase migration up --local` | PASS: applied `00100`–`00400` in order to the existing local DB, no reset.                                                                         |
+| `$env:SUPABASE_HOME=Join-Path (Get-Location) '.supabase-home'; npm run test:rls`                  | PASS: 5 pgTAP files, 231 assertions.                                                                                                               |
+| `npm run check`                                                                                   | PASS: Prettier, TypeScript, ESLint, 107 Vitest tests, 10 helper tests, optimized Next build.                                                       |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local`                         | PASS: health-gated smoke; 12 identity, 16 Activity, 20 directory, 9 Milestone 4 and 13 Milestone 5 real local groups; synthetic cleanup succeeded. |
+| `$env:APP_ENV='local'; $env:LOCAL_IDENTITY_TESTS='1'; npm run test:local -- push`                 | PASS focused 13 groups with real Auth, HTTP, Postgres and browser; controlled provider responses only for deterministic delivery failures.         |
+
+The new suite verifies exact six-student publication and inbox/outbox targeting,
+unassigned-user denial, two devices on one account, cross-account subscription
+denial, ten-device limit, own read/unread state, no Activity obligation from an
+announcement, atomic claim concurrency, crash-lease recovery, 429 retry, 410
+disable, expired-device handling, malicious-endpoint rejection, idempotent
+repeat dispatch and 124 synthetic device deliveries in bounded passes without
+external network traffic. The installed browser verified open-inbox polling,
+reload and reconnect reconciliation. Existing Milestone 4 Edge completion and
+monitoring flows passed in the combined run.
+
+A final review caught that reactivating a disabled endpoint could exceed the
+ten-device limit. Forward migration `00400` counts reactivation as a new active
+slot; the focused real database/API suite covers the boundary.
+
+After Docker restarted the existing local database from backup, a read-only
+`supabase migration list --local` confirmed `00100` through `00400` were
+already applied. The database, Auth and API gateway containers reported
+healthy. No migration was reapplied. The final `npm run check`, 231 pgTAP
+assertions and combined local integration suite were rerun successfully
+against that preserved database.
+
+**Real desktop push is unverified.** Actual PushManager registration was tried
+in headless and visible Microsoft Edge and visible Chrome on this laptop. Each
+returned `Registration failed - permission denied`. No real browser
+subscription was stored; therefore there was no real push-service acceptance,
+OS popup or click-through observation. The application displayed the failure
+and retained the in-app inbox. An early browser assertion incorrectly matched
+the text `Not enabled on this browser` as `Enabled on this browser`; it was
+narrowed to the exact enabled-state prefix. A new expiry-case test first failed
+because it expected two inbox rows after three real publications; the
+expectation was corrected. Both test failures were visible before final passing
+runs. The first local migration attempt failed because Postgres was stopped;
+the existing minimal Docker stack was started without reset. Initial package
+installation failed DNS in the sandbox and succeeded with approved local
+network access. No WSL or memory limits were changed.
+
+Local dispatch can run once or as a 15-second trusted watch process; neither
+is a hosted scheduler. A trusted Node scheduler, secret distribution, hosted
+database connectivity, quota/cost checks and a genuine HTTPS browser/provider
+delivery test are required before a push-enabled release. Offline laptop
+shutdown and post-reboot popup behavior are not guaranteed or verified. No
+approved production roster/users were used. See [NOTIFICATIONS.md](NOTIFICATIONS.md)
+for commands, failure semantics, license/dependency review and hosting limits.
+
+## Milestone 5.1 — real local Windows Web Push, 2026-10-28
+
+The earlier automated subscription failure came from private Playwright
+contexts: Chromium reports incognito push denial as `Registration failed -
+permission denied`. Browser diagnostics recorded a secure loopback origin,
+granted Notification/PushManager permission, an activated worker, a valid
+65-byte VAPID public key and user activation at `subscribe()`. A normal Chrome
+profile manually registered a real subscription; PostgreSQL stored one active
+device for the synthetic student. Another authenticated synthetic user got
+status `false` and HTTP 403 when trying to claim that endpoint. No real
+department account or roster was used.
+
+The trusted local worker made two Activity delivery attempts before the click
+correction, each with one claimed job, one real provider request and HTTP
+201/`accepted`. The first produced no observed Windows notice; a read-only
+Windows check found the Chrome notification sender disabled (`Enabled=0`)
+while global toasts were enabled. The user manually enabled Chrome. The second
+notice appeared in Notification Center, but clicking it did not navigate the
+existing ARKST inbox tab. The service worker's existing-tab-first click path
+had no fallback when that operation failed. It now opens and focuses the
+validated same-origin destination first, with an existing-tab fallback.
+Three deterministic tests cover the new click path and URL boundary; they are
+not treated as desktop delivery evidence.
+
+After an unexpected laptop shutdown, the same local database and uncommitted
+worktree were recovered without reset or migration replay. All 17 local
+migrations still matched through `20261028000400`. The existing synthetic
+accounts, active subscription, two Activities and both accepted delivery
+records survived. The existing production build was restarted once on loopback;
+`/login` returned 200 and the served JavaScript contained the corrected
+handler. The user manually disabled/re-enabled browser push, closed all ARKST
+tabs and reopened the inbox, which again showed `Enabled on this browser`.
+
+One **post-fix** synthetic Activity was published through the authorized
+selected-student API. Its sole outbox job was claimed once and the real push
+provider returned HTTP 201. The user observed the Windows notification and
+Notification Center entry, clicked it, and saw Chrome open the correct
+`Manual Web Push … click check` Activity. PostgreSQL confirmed the assignment
+belonged to that student and their completion persisted as `reported`, with
+the authenticated student as actor, a submission timestamp and
+`created`/`assigned`/`reported` history. The recipient's preview returned
+200 with the correct Activity URL; another student received 404.
+
+| Verification command or observation                                                                                                       | Result                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node node_modules/supabase/dist/supabase.js migration list --local`; `docker ps`                                                         | Local history matched through `00400`; database, Auth and gateway healthy after reboot.                                                        |
+| `node scripts/manual-local-push.mjs verify`                                                                                               | PASS: one active real student subscription; other signed-in student status false and registration HTTP 403.                                    |
+| `node scripts/manual-local-push.mjs publish`; `node scripts/manual-local-push.mjs dispatch`; `node scripts/manual-local-push.mjs inspect` | PASS: one post-fix authorized Activity/outbox, one claim, one provider attempt, HTTP 201 accepted, correct recipient preview and outsider 404. |
+| Manual normal-Chrome/Windows observation                                                                                                  | PASS: notification appeared, click opened the correct Activity; subsequent `reported` completion persisted.                                    |
+| `npm run test:rls`                                                                                                                        | PASS: 5 files, 231 assertions after reboot.                                                                                                    |
+| `node --test tests/integration/push-worker-click.test.mjs`                                                                                | PASS: 3 deterministic click/URL tests after reboot.                                                                                            |
+| `npx prettier --check` on touched files                                                                                                   | PASS after reboot.                                                                                                                             |
+| `npm run check` before reboot, after the worker correction                                                                                | PASS: formatting, typecheck, lint, 107 Vitest tests, 13 Node helper/worker tests and production build. No rebuild was needed after reboot.     |
+
+The existing reduced-memory local stack, identity, Activity, directory and
+inbox code were preserved. No remote Supabase access, production roster,
+database reset, branch, commit, push or deployment occurred. Tab-closed push,
+logout/account-switch suppression in an ordinary browser, hosted HTTPS
+delivery and a hosted trusted scheduler remain unverified; local browser
+success is not a production-readiness claim. The synthetic fixture and
+Git-ignored local credentials remain available for any explicitly requested
+follow-up verification; they were not silently deleted.

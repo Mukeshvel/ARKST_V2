@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { once } from 'node:events';
 import net from 'node:net';
 import path from 'node:path';
+import webpush from 'web-push';
 import {
   localTestConfiguration,
   localFetch,
@@ -20,7 +21,9 @@ async function main() {
   );
   const suite = process.argv[2] ?? 'all';
   assert.ok(
-    ['all', 'identity', 'activity', 'directory', 'operations'].includes(suite),
+    ['all', 'identity', 'activity', 'directory', 'operations', 'push'].includes(
+      suite,
+    ),
   );
   const { stdout } = await execute(
     process.execPath,
@@ -50,11 +53,17 @@ async function main() {
     LOCAL_DATABASE_URL: settings.DB_URL,
     LOCAL_SUPABASE_SERVICE_ROLE_KEY: settings.SERVICE_ROLE_KEY,
   };
+  if (suite === 'all' || suite === 'push') {
+    const keys = webpush.generateVAPIDKeys();
+    environment.PUSH_VAPID_PUBLIC_KEY = keys.publicKey;
+    environment.PUSH_VAPID_PRIVATE_KEY = keys.privateKey;
+    environment.PUSH_VAPID_SUBJECT = 'mailto:arkst-local@example.test';
+  }
   const config = localTestConfiguration(environment);
   const appEnvironment = { ...environment };
   for (const key of Object.keys(appEnvironment)) {
     if (
-      /SERVICE_ROLE|SECRET|DATABASE_URL|SUPABASE_ACCESS_TOKEN|LOCAL_IDENTITY_TESTS/.test(
+      /SERVICE_ROLE|SECRET|PRIVATE_KEY|DATABASE_URL|SUPABASE_ACCESS_TOKEN|LOCAL_IDENTITY_TESTS/.test(
         key,
       )
     )
@@ -124,6 +133,8 @@ async function main() {
       await run('scripts/test-local-directory.mjs');
     if (suite === 'all' || suite === 'operations')
       await run('scripts/test-local-operations.mjs');
+    if (suite === 'all' || suite === 'push')
+      await run('scripts/test-local-push.mjs');
   } finally {
     if (server.exitCode === null) {
       const stopped = once(server, 'exit');

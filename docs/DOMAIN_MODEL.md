@@ -136,8 +136,19 @@ stored as a new Activity category or copied into a parallel completion pool.
 published audience snapshot. They have no completion state and cannot cancel
 or rewrite Activities. `notifications` stores one durable recipient/source
 message and read timestamp for each new Activity assignment or announcement.
-`notification_outbox` stores one event per notification for future delivery;
-`processed_at` remains unset until a real worker is implemented. The unique
+`notification_outbox` stores one event per notification; at Milestone 4,
+`processed_at` remained unset until a real worker was implemented. The unique
 recipient/source key and outbox notification key are idempotency boundaries.
 Deleting a deprovisioned account removes its private inbox and outbox entries;
 Activity and announcement history are separate.
+
+## Milestone 5 push delivery records
+
+`push_subscriptions` belongs to one active profile and stores the browser's
+endpoint, encryption keys, optional expiration and disable state. It is not
+a student-targeting source. `push_deliveries` tracks one outbox/device pair,
+attempt count, next due time, provider status class and accepted timestamp.
+The original `notification_outbox` now also holds a due time, claim lease,
+recipient-device snapshot time, 24-hour expiration and final outcome. The
+inbox row remains independent of push outcomes and read state. Local account
+deletion cascades private device and delivery rows; Activity history remains.

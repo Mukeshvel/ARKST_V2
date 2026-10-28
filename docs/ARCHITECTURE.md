@@ -158,13 +158,33 @@ announcement-recipient insert triggers write one notification per source and
 recipient, followed by one outbox event, in the publication transaction.
 Unique keys make repeated event processing idempotent. Student inbox SELECT
 is protected by recipient RLS; read state changes through a caller-checked RPC.
-The browser refreshes inbox data on focus/visibility. The outbox has no worker
-yet, so no desktop push or offline delivery is claimed.
+At Milestone 4, the browser refreshed inbox data on focus/visibility and the
+outbox had no worker. Milestone 5 adds bounded polling and a trusted dispatcher.
+
+## Milestone 5 notification delivery
+
+The existing inbox/outbox remains the central publication path. Forward-only
+migrations add private per-user browser subscriptions, per-device attempts,
+outbox due time, expiration and a recoverable claim lease. The same authenticated
+server session and RLS protect inbox reads. Push subscription mutations use
+same-origin APIs and fixed-path SECURITY DEFINER functions deriving `auth.uid()`;
+ordinary users cannot read subscription keys, claim jobs, or edit delivery
+records. The Node dispatcher uses a separate server-only database connection,
+never a browser/service-role bundle. It validates provider hosts before Web
+Push. Its service worker fetches an own-inbox preview through RLS before
+display, so a logout/account switch fails closed. Only generic lock-screen
+content and a protected same-origin destination are shown.
+
+Inbox polling is 20 seconds and navigation unread polling is 30 seconds while
+visible, with focus/reconnect reconciliation. The local dispatcher can run
+continuously at a 15-second interval. Hosted scheduling and real provider
+acceptance remain unverified deployment boundaries. See [NOTIFICATIONS.md](NOTIFICATIONS.md)
+for lease/retry semantics, local commands, limits and actual browser evidence.
 
 ## Future academic workflows — not implemented
 
 Groups/dynamic membership, recurrence generation, activity editing/cancellation,
-desktop push, counselor follow-up delivery and catch-up remain future work.
+hosted push scheduling, counselor follow-up delivery and catch-up remain future work.
 They can reference the same Activity and assignment IDs. Group targeting is rejected,
 not expanded into simulated recipients. Reviewer verification remains an API operation;
 the current dashboards display accurate read-only review status.

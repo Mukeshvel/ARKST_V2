@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Responsibility } from '@/data/identity';
+import { InboxLink } from './inbox-link';
 
 export function currentCounselor(responsibilities: Responsibility[]) {
   const now = Date.now();
@@ -34,7 +35,7 @@ export function DashboardNav({
             )}
           </>
         )}
-        <Link href="/dashboard/notifications">Inbox</Link>
+        <InboxLink />
         <Link href="/profile">Profile</Link>
         <form action="/auth/logout" method="post">
           <button className="dashboard-text-button" type="submit">

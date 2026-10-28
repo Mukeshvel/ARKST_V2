@@ -1,6 +1,7 @@
 import { DashboardNav } from '../dashboard-nav';
 import { dashboardIdentity, DashboardFailure } from '../identity';
 import { NotificationInbox } from './notification-inbox';
+import { PushControl } from './push-control';
 
 export const dynamic = 'force-dynamic';
 export default async function NotificationsPage() {
@@ -18,6 +19,7 @@ export default async function NotificationsPage() {
         <p>Activity assignments and announcements sent to your account.</p>
       </div>
       <NotificationInbox />
+      <PushControl />
     </main>
   );
 }

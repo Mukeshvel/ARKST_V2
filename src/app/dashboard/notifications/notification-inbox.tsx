@@ -59,25 +59,35 @@ export function NotificationInbox() {
     const refresh = () => {
       if (document.visibilityState === 'visible') void load(offset);
     };
+    const timer = window.setInterval(refresh, 20000);
     window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
     document.addEventListener('visibilitychange', refresh);
+    navigator.serviceWorker?.addEventListener('message', refresh);
     return () => {
+      window.clearInterval(timer);
       window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
       document.removeEventListener('visibilitychange', refresh);
+      navigator.serviceWorker?.removeEventListener('message', refresh);
     };
   }, [load, offset]);
 
-  async function markRead(id: string) {
+  async function changeRead(id: string, read: boolean) {
     if (busyId) return;
     setBusyId(id);
     setError('');
     try {
-      await dashboardJson(`/api/notifications/${id}/read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
+      await dashboardJson(
+        `/api/notifications/${id}/${read ? 'read' : 'unread'}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        },
+      );
       await load(offset);
+      window.dispatchEvent(new Event('arkst-inbox-changed'));
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -130,16 +140,18 @@ export function NotificationInbox() {
                 <p className="dashboard-muted">{formatWhen(row.created_at)}</p>
                 <div className="dashboard-actions">
                   <Link href={href}>Open {row.source_kind}</Link>
-                  {!row.read_at && (
-                    <button
-                      type="button"
-                      className="dashboard-secondary"
-                      disabled={busyId !== null}
-                      onClick={() => void markRead(row.id)}
-                    >
-                      {busyId === row.id ? 'Saving…' : 'Mark read'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="dashboard-secondary"
+                    disabled={busyId !== null}
+                    onClick={() => void changeRead(row.id, !row.read_at)}
+                  >
+                    {busyId === row.id
+                      ? 'Saving…'
+                      : row.read_at
+                        ? 'Mark unread'
+                        : 'Mark read'}
+                  </button>
                 </div>
               </article>
             );
